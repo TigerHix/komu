@@ -1,0 +1,79 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+model Manga {
+  id          String   @id @default(cuid())
+  title       String
+  type        String   // "Volume" or "Chapter"
+  number      Int?     // Volume 3 or Chapter 51
+  author      String?
+  description String?
+  thumbnail   String?  // Path to thumbnail image
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  pages       Page[]
+  
+  @@map("manga")
+}
+
+model Page {
+  id         String    @id @default(cuid())
+  mangaId    String
+  pageNum    Int
+  imagePath  String
+  ocrStatus  OcrStatus @default(PENDING)
+  ocrStartedAt DateTime?
+  ocrCompletedAt DateTime?
+  imageWidth Int?
+  imageHeight Int?
+  
+  manga      Manga     @relation(fields: [mangaId], references: [id], onDelete: Cascade)
+  textBlocks TextBlock[]
+  
+  @@unique([mangaId, pageNum])
+  @@map("pages")
+}
+
+model TextBlock {
+  id         String  @id @default(cuid())
+  pageId     String
+  text       String
+  bbox       String  // JSON array: [x, y, width, height]
+  width      Int
+  height     Int
+  lines      Int
+  vertical   Boolean
+  fontSize   Float?
+  confidence Float
+  textLines  String  // JSON array of strings
+  
+  page       Page    @relation(fields: [pageId], references: [id], onDelete: Cascade)
+  
+  @@map("text_blocks")
+}
+
+model OcrCompletionStatus {
+  id             String   @id @default(cuid())
+  totalPages     Int
+  completedPages Int
+  failedPages    Int
+  completedAt    DateTime
+  status         String   // 'unread' | 'dismissed'
+  createdAt      DateTime @default(now())
+  
+  @@map("ocr_completion_status")
+}
+
+enum OcrStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}

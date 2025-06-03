@@ -1,0 +1,40 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(mkdir:*)",
+      "Bash(npm create:*)",
+      "Bash(npm init:*)",
+      "Bash(npm install:*)",
+      "Bash(hostname:*)",
+      "Bash(bun run:*)",
+      "Bash(python test_ocr.py:*)",
+      "Bash(python3:*)",
+      "Bash(sudo apt:*)",
+      "Bash(sudo apt install:*)",
+      "Bash(find:*)",
+      "Bash(source:*)",
+      "Bash(pip install:*)",
+      "Bash(ls:*)",
+      "Bash(chmod:*)",
+      "Bash(npm run typecheck:*)",
+      "Bash(npx prisma generate:*)",
+      "Bash(npx prisma:*)",
+      "Bash(bun add:*)",
+      "WebFetch(domain:elysiajs.com)",
+      "Bash(grep:*)",
+      "Bash(rg:*)",
+      "Bash(python:*)",
+      "Bash(../venv/bin/python manual_evaluation.py)",
+      "Bash(PYTHONPATH=../venv/lib/python3.12/site-packages ../venv/bin/python manual_evaluation.py)",
+      "WebFetch(domain:github.com)",
+      "Bash(git clone:*)",
+      "Bash(docker compose:*)",
+      "Bash(sudo systemctl status:*)",
+      "Bash(docker exec:*)",
+      "Bash(systemctl status:*)",
+      "Bash(sudo systemctl start:*)",
+      "WebFetch(domain:jaxs.onl)"
+    ],
+    "deny": []
+  }
+}
