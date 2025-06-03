@@ -1,0 +1,6 @@
+[submodule "comic_text_detector"]
+	path = comic_text_detector
+	url = https://github.com/dmMaze/comic-text-detector.git
+[submodule "ichiran"]
+	path = ichiran
+	url = https://github.com/tshatrov/ichiran.git
