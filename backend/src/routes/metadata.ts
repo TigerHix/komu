@@ -25,29 +25,59 @@ export const metadataRoutes = new Elysia({ prefix: '/api' })
     return manga
   })
   
-  .post('/metadata/:id/fetch', async ({ params }) => {
+  .post('/metadata/:id/fetch', async ({ params, body }) => {
     console.log('🚀 /metadata/:id/fetch route called with id:', params.id)
     
-    const manga = await prisma.manga.findUnique({
-      where: { id: params.id },
-      select: { title: true }
-    })
+    // Use form data if provided, otherwise fall back to database values
+    const formData = body as { title?: string, type?: 'Volume' | 'Chapter', number?: number }
     
-    console.log('📚 Found manga:', manga)
+    let title = formData.title
+    let type = formData.type  
+    let number = formData.number
     
-    if (!manga) {
-      console.log('❌ Manga not found for id:', params.id)
-      throw new Error('Manga not found')
+    // If no form data provided, get from database
+    if (!title) {
+      const manga = await prisma.manga.findUnique({
+        where: { id: params.id },
+        select: { title: true, type: true, number: true }
+      })
+      
+      if (!manga) {
+        console.log('❌ Manga not found for id:', params.id)
+        throw new Error('Manga not found')
+      }
+      
+      title = manga.title
+      type = manga.type
+      number = manga.number
     }
     
-    console.log('🔍 Fetching metadata for title:', manga.title)
+    console.log('📚 Using metadata:', { title, type, number })
+    
+    // Construct search title with Japanese notation
+    let searchTitle = title
+    if (number) {
+      if (type === 'Volume') {
+        searchTitle += ` ${number}巻`
+      } else if (type === 'Chapter') {
+        searchTitle += ` 第${number}話`
+      }
+    }
+    
+    console.log('🔍 Fetching metadata for title:', searchTitle)
     
     // Fetch metadata suggestions in background
-    const suggestions = await fetchMetadata(manga.title)
+    const suggestions = await fetchMetadata(searchTitle)
     
     console.log('✅ Metadata fetch completed, returning suggestions:', suggestions)
     
     return suggestions
+  }, {
+    body: t.Optional(t.Object({
+      title: t.Optional(t.String()),
+      type: t.Optional(t.Union([t.Literal('Volume'), t.Literal('Chapter')])),
+      number: t.Optional(t.Number())
+    }))
   })
   
   .put('/metadata/:id', async ({ params, body }) => {

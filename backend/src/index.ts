@@ -2,6 +2,7 @@ import 'dotenv/config'
 import { Elysia, t } from 'elysia'
 import { cors } from '@elysiajs/cors'
 import { staticPlugin } from '@elysiajs/static'
+import path from 'path'
 import { uploadRoutes } from './routes/upload'
 import { mangaRoutes } from './routes/manga'
 import { metadataRoutes } from './routes/metadata'
@@ -32,7 +33,7 @@ const app = new Elysia({
     console.log(`${ctx.request.method} ${ctx.request.url}`)
   })
   .use(staticPlugin({
-    assets: 'uploads',
+    assets: path.join(process.cwd(), 'uploads'),
     prefix: '/uploads'
   }))
   .use(uploadRoutes)

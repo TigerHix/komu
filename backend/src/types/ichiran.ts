@@ -11,7 +11,6 @@ export interface WordInfo {
   conjugations?: string | 'ROOT'
   score?: number
   components?: WordInfo[]
-  alternative?: boolean
   primary?: boolean
   start?: number
   end?: number
@@ -66,8 +65,8 @@ export interface IchiranSegmentation {
   1?: string               // Non-word text segments (punctuation, etc.)
 }
 
-// Top-level result structure from ichiran -f (array of segmentations)
-export type IchiranRawResult = IchiranSegmentation[]
+// Top-level result structure from ichiran -f (array of segmentations and strings)
+export type IchiranRawResult = (IchiranSegmentation | string)[]
 
 // Simplified token interface for API responses
 export interface IchiranToken {

@@ -57,6 +57,8 @@ export default function MetadataEdit() {
   }
 
   const fetchSuggestions = async () => {
+    if (!metadata) return
+    
     setFetchingSuggestions(true)
     
     // Show toast notification that AI is fetching
@@ -67,7 +69,15 @@ export default function MetadataEdit() {
     
     try {
       const response = await fetch(`/api/metadata/${id}/fetch`, {
-        method: 'POST'
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          title: metadata.title,
+          type: metadata.type,
+          number: metadata.number
+        })
       })
       if (response.ok) {
         const data = await response.json()
@@ -236,17 +246,28 @@ export default function MetadataEdit() {
   }
 
   return (
-    <div className="min-h-screen bg-background p-4">
-      <div className="max-w-2xl mx-auto">
+    <div className="min-h-screen bg-background">
+      {/* Status bar with accent color background */}
+      <div className="bg-accent p-4">
+        <div className="max-w-2xl mx-auto">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-3xl font-bold text-accent-foreground">komu</h1>
+            </div>
+            <Button 
+              variant="ghost" 
+              onClick={() => navigate('/')}
+              className="text-accent-foreground hover:bg-accent-foreground/10"
+            >
+              ← Back to Library
+            </Button>
+          </div>
+        </div>
+      </div>
+      
+      <div className="max-w-2xl mx-auto p-4">
         <div className="mb-8">
-          <Button 
-            variant="ghost" 
-            onClick={() => navigate('/')}
-            className="mb-4"
-          >
-            ← Back to Library
-          </Button>
-          <h1 className="text-3xl font-bold">Edit</h1>
+          <h2 className="text-2xl font-bold">Edit Metadata</h2>
           <p className="text-muted-foreground mt-2">
             Update information about your manga
           </p>
@@ -335,6 +356,26 @@ export default function MetadataEdit() {
             </div>
           </div>
 
+          {/* AI Suggestions Button */}
+          <div>
+            <Button 
+              onClick={fetchSuggestions} 
+              disabled={fetchingSuggestions}
+              className="w-full"
+              variant="outline"
+            >
+              {fetchingSuggestions ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <Sparkles className="h-4 w-4 mr-2" />
+              )}
+              Fetch from Web
+            </Button>
+            <p className="text-xs text-muted-foreground mt-1">
+              AI will search the web and suggest metadata for the fields below
+            </p>
+          </div>
+
           <div>
             <Label htmlFor="author">Author</Label>
             <Input
@@ -358,18 +399,6 @@ export default function MetadataEdit() {
             <Button onClick={handleSave} disabled={saving}>
               {saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
               Save Changes
-            </Button>
-            <Button 
-              variant="outline" 
-              onClick={fetchSuggestions} 
-              disabled={fetchingSuggestions}
-            >
-              {fetchingSuggestions ? (
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              ) : (
-                <Sparkles className="h-4 w-4 mr-2" />
-              )}
-              AI Suggestions
             </Button>
             <Button 
               variant="outline" 

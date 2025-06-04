@@ -1,0 +1,164 @@
+import { useState, useCallback, useRef } from 'react'
+import { TextBlock, Page, READER_CONSTANTS } from '@/constants/reader'
+
+interface OcrPageStatus {
+  ocrStatus: string
+  textBlocks?: TextBlock[]
+  imageSize?: { width: number; height: number }
+}
+
+export function useOcrService() {
+  const [pageOcrStatus, setPageOcrStatus] = useState<Record<string, string>>({})
+  const [singlePageData, setSinglePageData] = useState<{
+    textBlocks: TextBlock[]
+    showTextBlocks: boolean
+    imageSize: { width: number; height: number } | null
+  }>({
+    textBlocks: [],
+    showTextBlocks: false,
+    imageSize: null
+  })
+  
+  const [scrollPageData, setScrollPageData] = useState<{
+    textBlocks: Record<number, TextBlock[]>
+    imageSizes: Record<number, { width: number; height: number }>
+  }>({
+    textBlocks: {},
+    imageSizes: {}
+  })
+
+  const viewTimerRef = useRef<number | null>(null)
+
+  const notifyPageView = useCallback(async (pageId: string) => {
+    try {
+      await fetch(`/api/reader/view-page/${pageId}`, {
+        method: 'POST'
+      })
+    } catch (error) {
+      console.error('Error notifying page view:', error)
+    }
+  }, [])
+
+  const fetchOcrResults = useCallback(async (pageId: string): Promise<OcrPageStatus | null> => {
+    try {
+      const response = await fetch(`/api/ocr/page/${pageId}/status`)
+      if (!response.ok) return null
+
+      const status = await response.json()
+      
+      setPageOcrStatus(prev => ({
+        ...prev,
+        [pageId]: status.ocrStatus
+      }))
+
+      if (status.ocrStatus === 'COMPLETED') {
+        const resultsResponse = await fetch(`/api/ocr/page/${pageId}/results`)
+        if (resultsResponse.ok) {
+          const data = await resultsResponse.json()
+          return {
+            ocrStatus: status.ocrStatus,
+            textBlocks: data.textBlocks || [],
+            imageSize: data.imageSize
+          }
+        }
+      }
+      
+      return { ocrStatus: status.ocrStatus }
+    } catch (error) {
+      console.error('Error fetching OCR results:', error)
+      return null
+    }
+  }, [])
+
+  const checkSinglePageOcr = useCallback(async (pageId: string) => {
+    const result = await fetchOcrResults(pageId)
+    if (!result) return
+
+    if (result.textBlocks && result.imageSize) {
+      setSinglePageData({
+        textBlocks: result.textBlocks,
+        showTextBlocks: result.textBlocks.length > 0,
+        imageSize: result.imageSize
+      })
+    }
+  }, [fetchOcrResults])
+
+  const checkScrollPageOcr = useCallback(async (pageNum: number, page: Page) => {
+    const result = await fetchOcrResults(page.id)
+    if (!result) return
+
+    if (result.textBlocks && result.imageSize) {
+      setScrollPageData(prev => ({
+        textBlocks: {
+          ...prev.textBlocks,
+          [pageNum]: result.textBlocks!
+        },
+        imageSizes: {
+          ...prev.imageSizes,
+          [pageNum]: result.imageSize!
+        }
+      }))
+    }
+  }, [fetchOcrResults])
+
+  const startPageViewTracking = useCallback((pageId: string) => {
+    if (viewTimerRef.current) {
+      clearTimeout(viewTimerRef.current)
+    }
+
+    viewTimerRef.current = setTimeout(() => {
+      notifyPageView(pageId)
+    }, READER_CONSTANTS.PAGE_VIEW_DELAY)
+
+    return () => {
+      if (viewTimerRef.current) {
+        clearTimeout(viewTimerRef.current)
+      }
+    }
+  }, [notifyPageView])
+
+  const resetSinglePageData = useCallback(() => {
+    setSinglePageData({
+      textBlocks: [],
+      showTextBlocks: false,
+      imageSize: null
+    })
+  }, [])
+
+  const resetScrollData = useCallback(() => {
+    setScrollPageData({
+      textBlocks: {},
+      imageSizes: {}
+    })
+  }, [])
+
+  const resetAllOcrData = useCallback(() => {
+    resetSinglePageData()
+    resetScrollData()
+    if (viewTimerRef.current) {
+      clearTimeout(viewTimerRef.current)
+    }
+  }, [resetSinglePageData, resetScrollData])
+
+  return {
+    // Status tracking
+    pageOcrStatus,
+    
+    // Single page mode
+    singlePageTextBlocks: singlePageData.textBlocks,
+    showTextBlocks: singlePageData.showTextBlocks,
+    singlePageImageSize: singlePageData.imageSize,
+    
+    // Scrolling mode
+    scrollTextBlocks: scrollPageData.textBlocks,
+    scrollImageSizes: scrollPageData.imageSizes,
+    
+    // Actions
+    checkSinglePageOcr,
+    checkScrollPageOcr,
+    startPageViewTracking,
+    resetSinglePageData,
+    resetScrollData,
+    resetAllOcrData,
+  }
+}

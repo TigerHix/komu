@@ -14,6 +14,7 @@ export default defineConfig({
     },
   },
   server: {
+    allowedHosts: ['tirapc'],
     port: FRONTEND_PORT,
     proxy: {
       '/api': {

@@ -15,11 +15,19 @@ export const mangaRoutes = new Elysia({ prefix: '/api' })
         number: true,
         author: true,
         thumbnail: true,
-        createdAt: true
+        currentPage: true,
+        createdAt: true,
+        _count: {
+          select: { pages: true }
+        }
       }
     })
     
-    return manga
+    return manga.map(m => ({
+      ...m,
+      totalPages: m._count.pages,
+      progressPercent: m._count.pages > 0 ? Math.round((m.currentPage / m._count.pages) * 100) : 0
+    }))
   })
   
   .get('/manga/:id', async ({ params }) => {
@@ -125,5 +133,43 @@ export const mangaRoutes = new Elysia({ prefix: '/api' })
       success: true, 
       message: `OCR data removed for ${pages.length} pages. They will be re-processed automatically.`,
       pageCount: pages.length
+    }
+  })
+
+  .put('/manga/:id/progress', async ({ params, body }) => {
+    const { currentPage } = body as { currentPage: number }
+    
+    if (typeof currentPage !== 'number' || currentPage < 0) {
+      throw new Error('Invalid currentPage value')
+    }
+    
+    // Verify manga exists and currentPage is within valid range
+    const manga = await prisma.manga.findUnique({
+      where: { id: params.id },
+      include: {
+        _count: {
+          select: { pages: true }
+        }
+      }
+    })
+    
+    if (!manga) {
+      throw new Error('Manga not found')
+    }
+    
+    if (currentPage >= manga._count.pages) {
+      throw new Error('currentPage exceeds total pages')
+    }
+    
+    // Update reading progress
+    await prisma.manga.update({
+      where: { id: params.id },
+      data: { currentPage }
+    })
+    
+    return { 
+      success: true, 
+      currentPage,
+      progressPercent: Math.round((currentPage / manga._count.pages) * 100)
     }
   })

@@ -33,7 +33,9 @@
       "Bash(docker exec:*)",
       "Bash(systemctl status:*)",
       "Bash(sudo systemctl start:*)",
-      "WebFetch(domain:jaxs.onl)"
+      "WebFetch(domain:jaxs.onl)",
+      "Bash(bunx prisma db:*)",
+      "WebFetch(domain:swiperjs.com)"
     ],
     "deny": []
   }

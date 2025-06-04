@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
+import { Progress } from '@/components/ui/progress'
 import { OcrStatusBlock } from '@/components/OcrStatusBlock'
-import { Plus, Book, Edit, Trash2 } from 'lucide-react'
+import { useToast } from '@/components/ui/use-toast'
+import { Plus, Book, Edit, Trash2, TestTube } from 'lucide-react'
 
 interface MangaItem {
   id: string
@@ -11,6 +13,9 @@ interface MangaItem {
   number?: number
   author?: string
   thumbnail?: string
+  currentPage: number
+  totalPages: number
+  progressPercent: number
   createdAt: string
 }
 
@@ -27,6 +32,7 @@ export default function Library() {
   const [manga, setManga] = useState<MangaItem[]>([])
   const [loading, setLoading] = useState(true)
   const [ocrStatus, setOcrStatus] = useState<OcrCompletionStatus | null>(null)
+  const { toast } = useToast()
 
   useEffect(() => {
     fetchManga()
@@ -118,20 +124,27 @@ export default function Library() {
   }
 
   return (
-    <div className="min-h-screen bg-background p-4">
-      <div className="max-w-6xl mx-auto">
-        <div className="flex items-center justify-between mb-8">
-          <div>
-            <h1 className="text-3xl font-bold">komu</h1>
+    <div className="min-h-screen bg-background">
+      {/* Status bar with accent color background */}
+      <div className="bg-accent p-4">
+        <div className="max-w-6xl mx-auto">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-3xl font-bold text-accent-foreground">komu</h1>
+            </div>
+            <div className="flex gap-2">
+              <Link to="/upload">
+                <Button>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Manga
+                </Button>
+              </Link>
+            </div>
           </div>
-          <Link to="/upload">
-            <Button>
-              <Plus className="h-4 w-4 mr-2" />
-              Add Manga
-            </Button>
-          </Link>
         </div>
-
+      </div>
+      
+      <div className="max-w-6xl mx-auto p-4">
         {/* OCR Completion Status Block */}
         {ocrStatus && (
           <OcrStatusBlock
@@ -161,44 +174,90 @@ export default function Library() {
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
             {manga.map((item) => (
               <div key={item.id} className="group relative">
-                <Link
-                  to={`/reader/${item.id}`}
-                  className="block"
-                >
-                  <div className="bg-card rounded-lg shadow-sm overflow-hidden border hover:shadow-md transition-shadow">
-                    <div className="aspect-[3/4] bg-muted relative overflow-hidden">
-                      {item.thumbnail ? (
-                        <img
-                          src={item.thumbnail}
-                          alt={item.title}
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
-                        />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center">
-                          <Book className="h-12 w-12 text-muted-foreground" />
-                        </div>
-                      )}
-                    </div>
-                    <div className="p-3">
+                <div className="bg-card rounded-lg shadow-sm overflow-hidden border hover:shadow-md transition-shadow">
+                  {/* Cover image - direct link to reader */}
+                  <Link
+                    to={`/reader/${item.id}`}
+                    className="block aspect-[3/4] bg-muted relative overflow-hidden"
+                  >
+                    {item.thumbnail ? (
+                      <img
+                        src={item.thumbnail}
+                        alt={item.title}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center">
+                        <Book className="h-12 w-12 text-muted-foreground" />
+                      </div>
+                    )}
+                  </Link>
+                  
+                  {/* Title and info area - shows edit/delete on mobile tap */}
+                  <div className="p-3 relative">
+                    <div 
+                      className="cursor-pointer md:cursor-default"
+                      onClick={(e) => {
+                        // On mobile, toggle edit buttons. On desktop, do nothing (hover handles it)
+                        if (window.innerWidth < 768) {
+                          const buttons = e.currentTarget.parentElement?.querySelector('.mobile-edit-buttons')
+                          if (buttons) {
+                            buttons.classList.toggle('hidden')
+                          }
+                        }
+                      }}
+                    >
                       <h3 className="font-medium text-sm mb-1 line-clamp-2">
                         {item.title}
                       </h3>
-                      <div className="text-xs text-muted-foreground space-y-1">
+                      <div className="text-xs text-muted-foreground space-y-1 mb-2">
                         <div>
-                          {item.type} {item.number && `${item.number}`}
+                          {item.number ? `${item.type} ${item.number}` : `Unknown ${item.type}`}
                         </div>
-                        {item.author && (
-                          <div className="line-clamp-1">{item.author}</div>
-                        )}
+                        <div className="line-clamp-1">
+                          {item.author || 'Unknown Author'}
+                        </div>
                       </div>
+                      {item.totalPages > 0 && (
+                        <div className="space-y-1">
+                          <div className="flex justify-between text-xs text-muted-foreground">
+                            <span>
+                              {item.progressPercent === 0 
+                                ? `${item.totalPages} pages` 
+                                : `Page ${item.currentPage + 1} of ${item.totalPages}`
+                              }
+                            </span>
+                            <span>{item.progressPercent}%</span>
+                          </div>
+                          <Progress value={item.progressPercent} className="h-1.5" />
+                        </div>
+                      )}
+                    </div>
+                    
+                    {/* Mobile edit buttons - hidden by default, shown on title click */}
+                    <div className="mobile-edit-buttons hidden md:hidden mt-2 flex gap-2 justify-center">
+                      <Link to={`/metadata/${item.id}`}>
+                        <Button size="sm" variant="outline" className="flex-1">
+                          <Edit className="h-4 w-4 mr-1" />
+                          Edit
+                        </Button>
+                      </Link>
+                      <Button 
+                        size="sm" 
+                        variant="destructive"
+                        className="flex-1"
+                        onClick={() => deleteManga(item.id, item.title)}
+                      >
+                        <Trash2 className="h-4 w-4 mr-1" />
+                        Delete
+                      </Button>
                     </div>
                   </div>
-                </Link>
-                <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
-                  <Link
-                    to={`/metadata/${item.id}`}
-                    onClick={(e) => e.stopPropagation()}
-                  >
+                </div>
+                
+                {/* Desktop hover buttons - only visible on desktop */}
+                <div className="hidden md:flex absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity gap-1">
+                  <Link to={`/metadata/${item.id}`}>
                     <Button
                       size="sm"
                       variant="secondary"
@@ -211,11 +270,7 @@ export default function Library() {
                     size="sm"
                     variant="secondary"
                     className="h-8 w-8 p-0 bg-red-500/70 hover:bg-red-500/90 text-white border-0"
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      e.preventDefault()
-                      deleteManga(item.id, item.title)
-                    }}
+                    onClick={() => deleteManga(item.id, item.title)}
                   >
                     <Trash2 className="h-4 w-4" />
                   </Button>

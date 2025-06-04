@@ -6,6 +6,7 @@ import { OcrCompleteNotification } from '@/components/OcrCompleteNotification'
 import { useWebSocket } from '@/hooks/useWebSocket'
 import Library from '@/pages/Library'
 import Upload from '@/pages/Upload'
+import OrganizePages from '@/pages/OrganizePages'
 import MetadataEdit from '@/pages/MetadataEdit'
 import Reader from '@/pages/Reader'
 import './App.css'
@@ -49,8 +50,10 @@ function AppContent() {
       <Routes>
         <Route path="/" element={<Library />} />
         <Route path="/upload" element={<Upload />} />
+        <Route path="/organize" element={<OrganizePages />} />
         <Route path="/metadata/:id" element={<MetadataEdit />} />
         <Route path="/reader/:id" element={<Reader />} />
+        <Route path="/reader/:id/:page" element={<Reader />} />
       </Routes>
       <Toaster />
       

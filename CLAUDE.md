@@ -1,204 +1,254 @@
-# Manga Reader Project - Claude Code Memory
+# Manga Reader - Claude Code Memory
 
 ## 🎯 Project Overview
-Self-hosted manga reader web application focused on Japanese language learning. Built with microservices architecture using TypeScript and Python.
+Self-hosted manga reader web application for Japanese language learning. Microservices architecture with TypeScript frontend/backend and Python OCR services.
 
 ## 🏗️ Architecture
 
-### Frontend (React + shadcn/ui) - Port 5847
-- **Framework**: React 18 + TypeScript + Vite
-- **UI Library**: shadcn/ui components (Radix UI + Tailwind CSS)
-- **Features**: Real-time OCR progress, WebSocket integration, connection status monitoring
+### Frontend - Port 5847
+- **Stack**: React 18 + TypeScript + Vite + shadcn/ui + react-zoom-pan-pinch + react-window
+- **Features**: Real-time OCR progress, WebSocket integration, 3 reading modes with custom scrolling
 
-### Backend (Elysia + TypeScript) - Port 3847
-- **Framework**: Elysia (Bun-based)
-- **Database**: SQLite + Prisma ORM
-- **File Processing**: pdf2pic for PDF → JPG conversion
-- **AI Integration**: OpenRouter API for Japanese metadata fetching
-- **Features**: OCR queue management, WebSocket communication, automatic startup checks
+### Backend - Port 3847  
+- **Stack**: Elysia + Bun + SQLite + Prisma
+- **Features**: OCR queue management, PDF processing, AI metadata fetching
 
-### Inference Service (FastAPI + Python) - Port 8847
-- **Framework**: FastAPI with uvicorn
-- **Models**: comic_text_detector + manga-ocr for Japanese text detection/extraction
-- **Features**: Debug image generation, model caching, configurable debug mode
+### Inference Service - Port 8847
+- **Stack**: FastAPI + Python + manga-ocr + comic_text_detector
+- **Features**: Japanese text detection/extraction, debug image generation
 
-### Ichiran Tokenization Service (Docker-based)
-- **Framework**: Common Lisp + PostgreSQL via Docker Compose
-- **Features**: Superior Japanese text segmentation, dictionary lookups, conjugation analysis
-- **Integration**: Self-managing Docker containers, auto-startup, graceful cleanup
-- **API**: `/api/tokenize` endpoints in TypeScript backend
+### Ichiran Service - Docker
+- **Stack**: Common Lisp + PostgreSQL
+- **Features**: Japanese tokenization, dictionary lookups, conjugation analysis
 
 ## 📁 Project Structure
 ```
 /home/tiger/komu/
-├── frontend/                 # React frontend (port 5847)
-├── backend/                  # Elysia backend (port 3847)
-│   ├── src/routes/          # API endpoints (manga, ocr, reader, etc.)
-│   ├── src/lib/             # Core services (ocr-queue, websocket, etc.)
-│   ├── prisma/schema.prisma # Database schema
-│   └── uploads/             # Manga files & debug images
-├── inference/               # FastAPI service (port 8847)
-│   ├── src/main.py          # OCR endpoints
-│   ├── start_service.sh/.py # Startup scripts
-│   └── requirements.txt     # Python dependencies
-├── comic_text_detector/     # ML model library
-├── mokuro/                  # Mokuro OCR library
-├── ichiran/                 # Japanese tokenization service (Docker-based)
-├── PORTS.md                 # Port configuration guide
-└── CLAUDE.md               # This file
+├── frontend/             # React app (port 5847)
+├── backend/              # Elysia API (port 3847)  
+├── inference/            # Python OCR service (port 8847)
+├── comic_text_detector/  # Git submodule - text detection
+├── ichiran/              # Git submodule - tokenization
+└── CLAUDE.md            # This file
 ```
 
-## 🗄️ Storage & Data
+## 🛠️ Quick Start
 
-### Database (SQLite + Prisma)
-- **manga**: Metadata (title, author, type, pages, OCR status)
-- **pages**: Individual page images with ordering and OCR completion status
-- **text_blocks**: OCR text extraction with positioning and dimensions
+### Dependencies
+```bash
+# Install Bun
+curl -fsSL https://bun.sh/install | bash
 
-### File System
-- **Images**: `uploads/{mangaId}/page-*.jpg`
-- **Debug Images**: `uploads/{mangaId}/page-*_debug.jpg` (when debug enabled)
-- **Thumbnails**: Auto-generated from first page
+# Install ImageMagick  
+sudo apt update && sudo apt install imagemagick
 
-## 🛠️ Development Commands
+# Install project dependencies
+cd frontend && bun install
+cd ../backend && bun install
 
-### Quick Start (3 Services)
+# Setup database
+cd backend && bunx prisma generate && bunx prisma db push
+
+# Setup Python environment
+cd inference && source ../.venv/bin/activate && pip install -r requirements.txt
+```
+
+### Start Services
 ```bash
 # Terminal 1: Backend
 cd backend && bun run dev
 
-# Terminal 2: Frontend  
+# Terminal 2: Frontend
 cd frontend && bun run dev
 
-# Terminal 3: Inference Service
+# Terminal 3: Inference
 cd inference && ./start_service.sh
 ```
 
-### Inference Service Configuration
-```bash
-# Environment variables
-export INFERENCE_PORT=8847          # Service port (default: 8847)
-export GENERATE_DEBUG_IMAGES=true   # Enable/disable debug images (default: true)
-export INFERENCE_SERVICE_URL=http://localhost:8847  # Backend → Inference URL (auto-constructed from port)
-```
+## ⚙️ Configuration
 
 ### Environment Variables
+**Backend (.env)**
 ```bash
-# Backend (.env)
-BACKEND_PORT=3847                           # Backend server port
-FRONTEND_PORT=5847                          # Frontend port (for CORS)
-INFERENCE_PORT=8847                         # Inference service port
-INFERENCE_SERVICE_URL=http://localhost:8847 # Optional, auto-constructed from port
-OPENROUTER_API_KEY=your_key_here           # For AI metadata fetching
-
-# Frontend (.env)
-FRONTEND_PORT=5847                         # Dev server port
-VITE_BACKEND_PORT=3847                     # Backend port (for WebSocket)
-
-# Inference (.env)
-INFERENCE_PORT=8847                        # Service port
-FRONTEND_PORT=5847                         # Frontend port (for CORS)
-BACKEND_PORT=3847                          # Backend port (for CORS)
-GENERATE_DEBUG_IMAGES=true                 # Enable debug images
-
-# Ichiran Service (Backend)
-ICHIRAN_PATH=../../../ichiran               # Path to ichiran directory (default: ../../../ichiran)
-ICHIRAN_CONTAINER_NAME=komu-ichiran-service # Docker container name (default: komu-ichiran-service)
+BACKEND_PORT=3847
+FRONTEND_PORT=5847
+INFERENCE_PORT=8847
+OPENROUTER_API_KEY=your_key_here
+ICHIRAN_PATH=../ichiran
 ```
 
-## 🎮 Features
+**Frontend (.env)**
+```bash
+FRONTEND_PORT=5847
+VITE_BACKEND_PORT=3847
+```
 
-### ✅ Core Features
-- **PDF Upload & Processing**: Drag & drop with automatic JPG conversion
-- **AI Metadata Fetching**: OpenRouter API for Japanese author/description suggestions
-- **Library Management**: Grid view with thumbnails and inline editing
-- **Reader Interface**: 3 reading modes (RTL, LTR, scrolling), zoom/pan constraints, click navigation
-- **Production OCR System**: Automatic background processing with queue management
-- **Interactive Text Overlays**: Hover popups with Japanese text extraction
-- **Real-time Progress**: WebSocket updates for OCR processing status
-- **Connection Monitoring**: Automatic reconnection with status overlay
-- **Debug Mode**: Visual validation images with bounding boxes
+**Inference (.env)**
+```bash
+INFERENCE_PORT=8847
+GENERATE_DEBUG_IMAGES=true
+```
 
-### 📋 Future Features
-- **Search Integration**: Full-text search through OCR'd content
-- **Reading Progress**: Track page completion and bookmarks
-- **Dictionary Integration**: Hover/tap for word definitions
-- **Collections**: Organize manga into series
-- **User Authentication**: Multi-user support
+## 🎮 Core Features
+
+- ✅ **PDF Upload**: Drag & drop with automatic JPG conversion
+- ✅ **OCR Processing**: Background queue with real-time progress
+- ✅ **Reader Interface**: RTL/LTR/scroll modes with zoom/pan
+- ✅ **Text Overlays**: Interactive Japanese text extraction
+- ✅ **AI Metadata**: OpenRouter API for author/description suggestions
+- ✅ **Debug Mode**: Visual OCR validation with bounding boxes
+- ✅ **WebSocket Updates**: Real-time status and progress
+- ✅ **Library Management**: Grid view with thumbnails
+- ✅ **Custom Scrolling**: Virtualized vertical scrolling with zoom/pan support
+
+## 📖 Reading Modes
+
+### RTL/LTR Modes (Swiper-based)
+- **Implementation**: SwiperGallery component with Swiper.js
+- **Features**: Page-by-page navigation, zoom via `swiper-zoom-target`
+- **Navigation**: Arrow keys, click zones, swipe gestures
+- **Text Overlays**: SVG overlays with zoom synchronization
+
+### Scrolling Mode (Custom Implementation)
+- **Implementation**: ScrollingGallery with react-window + react-zoom-pan-pinch
+- **Features**: Continuous vertical scrolling, virtualized rendering
+- **Architecture**:
+  ```
+  TransformWrapper (zoom/pan)
+  └── TransformComponent
+      └── VariableSizeList (virtualization)
+          └── ScrollingSlide components
+  ```
+- **Smart Interactions**:
+  - Scale = 1.0: Native scrolling, panning disabled
+  - Scale > 1.0: Zoom/pan enabled, wheel zooms instead of scrolls
+- **Performance**: Only renders visible pages + 2 overscan buffer
+- **Height Calculation**: Dynamic sizing based on image aspect ratios
+
+### Zoom/Pan Behavior
+- **Double-click**: Toggle between 1x ↔ 1.5x zoom
+- **Pinch**: Touch zoom with momentum
+- **Mouse Wheel**: Conditional behavior based on zoom level
+- **Text Overlays**: Synchronized transforms in all modes
+
+## 📋 Database Schema
+
+- **manga**: title, author, type, pages, OCR status
+- **pages**: images with ordering and completion status  
+- **text_blocks**: OCR text with positioning and dimensions
 
 ## 🚀 Production Setup
 
 ### System Requirements
-- **Bun**: Package manager and runtime for both frontend and backend
-- **Python 3.13**: Inference service with manga-ocr, comic_text_detector
+- **Bun**: Package manager and runtime
+- **Python 3.13**: For inference service
 - **ImageMagick**: PDF processing
-- **NVIDIA GPU**: Optional, for faster OCR processing
+- **Docker**: For ichiran service
+- **NVIDIA GPU**: Optional, faster OCR
 
-### Default Ports (see PORTS.md for configuration)
-- **Frontend**: 5847 (dev) / 80,443 (prod)
-- **Backend**: 3847
-- **Inference**: 8847
+### Ports
+- Frontend: 5847 (dev) / 80,443 (prod)
+- Backend: 3847
+- Inference: 8847
 
 ### Production Checklist
-- [ ] Set up reverse proxy for all 3 services
-- [ ] Configure HTTPS and domain routing
-- [ ] Set up file backups (database + uploads + debug images)
-- [ ] Monitor disk space (manga images + debug images can be large)
-- [ ] Configure environment variables for all services
+- [ ] Reverse proxy for all services
+- [ ] HTTPS and domain routing
+- [ ] File backups (database + uploads)
+- [ ] Disk space monitoring
+- [ ] Environment variables configured
 
-## 🔧 Important Setup Notes
+## 🔧 Common Issues
 
-### Initial Setup
-```bash
-# 1. Install Bun (if not already installed)
-curl -fsSL https://bun.sh/install | bash
-
-# 2. Install ImageMagick (required for PDF processing)
-sudo apt update && sudo apt install imagemagick
-
-# 3. Install dependencies for frontend and backend
-cd frontend && bun install
-cd ../backend && bun install
-
-# 4. Setup database
-cd backend && bunx prisma generate && bunx prisma db push
-
-# 5. Install Python dependencies for inference service (IMPORTANT: use .venv not venv)
-cd inference && source ../.venv/bin/activate && pip install -r requirements.txt
-```
-
-### Common Issues
-- **Port Conflicts**: Check PORTS.md for configuration. Default ports: Frontend 5847, Backend 3847, Inference 8847
-- **Python Virtual Environment**: ALWAYS use `.venv` not `venv` - path is `../.venv/bin/activate`
-- **Startup Scripts**: Inference service startup scripts may have hardcoded ports - use environment variables
-- **Debug Images**: Check `GENERATE_DEBUG_IMAGES=true` and file permissions in uploads directory
-- **Large PDFs**: Background OCR processing handles timeouts automatically
-- **CORS**: All API calls use Vite proxy (`/api/*` and `/uploads/*`)
-- **Reader Architecture**: Code refactored into modular hooks and components for maintainability
+- **Port Conflicts**: Check PORTS.md for configuration
+- **Python Environment**: Use `.venv` not `venv` - path `../.venv/bin/activate`
+- **Debug Images**: Enable with `GENERATE_DEBUG_IMAGES=true`
+- **CORS**: API calls use Vite proxy (`/api/*` and `/uploads/*`)
 
 ## 🤝 Development Guidelines
-1. **Architecture**: Follow microservices pattern - keep backend, inference, and frontend separate
-2. **Package Manager**: Use Bun for all TypeScript/JavaScript projects (frontend and backend)
-3. **TypeScript**: Use strict typing, avoid `any` types
-4. **OCR Processing**: Always use HTTP API calls, never embed Python in TypeScript
-5. **Testing**: Test on both desktop and mobile, verify debug images when debugging OCR
-6. **Documentation**: Update CLAUDE.md when making architectural changes
 
----
+1. **Architecture**: Microservices - separate frontend, backend, inference
+2. **Package Manager**: Use Bun for TypeScript/JavaScript projects
+3. **TypeScript**: Strict typing, avoid `any` types
+4. **OCR Processing**: HTTP API calls only, no embedded Python
+5. **Git Submodules**: Use `git submodule update --remote` to update dependencies
 
-**Last Updated**: January 2025  
-**Status**: Reader Refactored - Clean Modular Architecture with 3 Reading Modes
+## 🤖 AI Integration
 
-## 🤖 AI Integration Details
-
-### Metadata Fetching (OpenRouter API)
-- **Model**: `openai/gpt-4o-search-preview` with web search
+### Metadata Fetching
+- **Model**: `openai/gpt-4o-search-preview`
 - **Sources**: Amazon.co.jp, Japanese bookstores
-- **Output**: Structured JSON with Japanese author names and descriptions
+- **Output**: Structured JSON with Japanese names/descriptions
 
-### OCR Text Detection (Inference Service)
-- **Models**: `comic_text_detector` + `manga-ocr` for detection and extraction
-- **API**: FastAPI service at `http://localhost:8847/ocr/detect`
-- **Features**: Bounding box detection, text extraction, debug image generation
-- **Debug**: Visual validation with green bboxes and orange text lines
-- **Storage**: Debug images saved as `page-*_debug.jpg` in uploads directory
+### OCR Pipeline
+- **Detection**: comic_text_detector for bounding boxes
+- **Extraction**: manga-ocr for Japanese text
+- **Debug**: Green boxes + orange text overlay
+- **Storage**: `page-*_debug.jpg` in uploads
+
+## 📱 iOS & PWA Optimizations
+
+### Progressive Web App Support
+- **Manifest**: `/manifest.json` with standalone display mode
+- **Add to Home Screen**: Full app experience when launched from iOS home screen
+- **Navigation**: SPA routing keeps all navigation within single WebView
+- **Icons**: 192x192 and 512x512 PNG icons for home screen
+
+### iOS-Specific Optimizations
+- **Status Bar**: Black status bar with proper safe area handling
+- **Scrollbar Hiding**: Aggressive webkit scrollbar removal in Reader
+- **Touch Handling**: Disabled bounce scrolling, tap highlights, text selection
+- **Safe Areas**: PWA-only safe area padding using `@media (display-mode: standalone)`
+- **Viewport**: Dynamic viewport height (`100dvh`) for proper mobile sizing
+
+### Key CSS Classes
+```css
+.ios-full-height {
+  height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
+  position: fixed;
+  touch-action: none;
+}
+
+@media (display-mode: standalone) {
+  .pwa-safe-bottom { padding-bottom: max(1rem, env(safe-area-inset-bottom)); }
+  .pwa-safe-top { padding-top: max(1rem, env(safe-area-inset-top)); }
+  .pwa-safe-x { padding-left/right: max(1rem, env(safe-area-inset-left/right)); }
+}
+```
+
+## 🎯 Text Overlay System
+
+### Smart Visibility
+- **Default**: Text boxes invisible (hover-only discovery)
+- **Grammar Mode**: Selected text block highlighted with green border
+- **Selective Highlighting**: Only clicked block remains visible during analysis
+- **State Management**: `selectedBlockIndex` tracks active text block across all components
+
+### Component Chain
+```
+Reader.tsx (selectedBlockIndex state)
+├── SwiperGallery/ScrollingGallery (pass props)
+└── SvgTextOverlay (render based on selection)
+```
+
+### Mobile Library Interaction
+- **Cover Tap**: Direct navigation to manga reader
+- **Title Tap**: Shows Edit/Delete buttons (mobile only)
+- **Responsive**: Desktop uses hover, mobile uses tap interaction
+- **Accessibility**: Large touch targets for mobile management actions
+
+## 🔄 Scrolling Mode Technical Details
+
+### Height Calculation
+- **Constraint**: `Math.min(containerWidth * aspectRatio, windowHeight)`
+- **Dynamic Updates**: `resetAfterIndex(0, true)` when image dimensions load
+- **Gap Prevention**: Proper aspect ratio calculation eliminates spacing issues
+- **First Page**: No special treatment, consistent with all other pages
+
+### Image Loading Timeline
+1. **Initial Render**: Uses default 1.4 aspect ratio
+2. **OCR Processing**: Real dimensions loaded into `scrollImageSizes`
+3. **Auto-Recalculation**: `useEffect` triggers list height updates
+4. **Final Layout**: All gaps resolved with actual image dimensions

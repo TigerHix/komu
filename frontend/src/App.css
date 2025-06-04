@@ -18,7 +18,7 @@
     --secondary-foreground: 222.2 47.4% 11.2%;
     --muted: 210 40% 96%;
     --muted-foreground: 215.4 16.3% 46.9%;
-    --accent: 210 40% 96%;
+    --accent: 98 23% 65%; /* rgb(168, 198, 134) converted to HSL */
     --accent-foreground: 222.2 47.4% 11.2%;
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 210 40% 98%;
@@ -41,8 +41,8 @@
     --secondary-foreground: 210 40% 98%;
     --muted: 217.2 32.6% 17.5%;
     --muted-foreground: 215 20.2% 65.1%;
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
+    --accent: 98 23% 65%; /* Same accent color for dark mode */
+    --accent-foreground: 222.2 47.4% 11.2%;
     --destructive: 0 62.8% 30.6%;
     --destructive-foreground: 210 40% 98%;
     --border: 217.2 32.6% 17.5%;
@@ -58,6 +58,90 @@
   body {
     @apply bg-background text-foreground;
     font-family: 'Nunito', 'Kosugi Maru', sans-serif;
+  }
+}
+
+/* iOS specific styles and touch optimizations */
+@layer utilities {
+  /* iOS touch optimizations */
+  .ios-touch-callout-none {
+    -webkit-touch-callout: none;
+  }
+  
+  .ios-tap-highlight-transparent {
+    -webkit-tap-highlight-color: transparent;
+  }
+  
+  .ios-user-select-none {
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+  }
+  
+  /* Prevent iOS elastic scrolling */
+  .ios-no-bounce {
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: none;
+  }
+  
+  /* iOS full height support */
+  .ios-full-height {
+    height: 100vh;
+    height: 100dvh; /* Dynamic viewport height for mobile */
+    /* Prevent iOS elastic bounce scrolling - only for reader */
+    overflow: hidden;
+    position: fixed;
+    width: 100%;
+    /* Completely disable scrollbars and overscroll on iOS */
+    -webkit-overflow-scrolling: auto;
+    overscroll-behavior: none;
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+    /* More aggressive scrollbar hiding */
+    touch-action: none;
+  }
+  
+  .ios-full-height::-webkit-scrollbar {
+    display: none !important;
+    width: 0 !important;
+    height: 0 !important;
+  }
+  
+  /* Prevent any child elements from showing scrollbars */
+  .ios-full-height *::-webkit-scrollbar {
+    display: none !important;
+    width: 0 !important;
+    height: 0 !important;
+  }
+  
+  /* PWA-only safe areas - only apply when in standalone mode */
+  @media (display-mode: standalone) {
+    .pwa-safe-top {
+      padding-top: max(1rem, env(safe-area-inset-top));
+    }
+    
+    .pwa-safe-bottom {
+      padding-bottom: max(1rem, env(safe-area-inset-bottom));
+    }
+    
+    .pwa-safe-left {
+      padding-left: max(1rem, env(safe-area-inset-left));
+    }
+    
+    .pwa-safe-right {
+      padding-right: max(1rem, env(safe-area-inset-right));
+    }
+    
+    .pwa-safe-x {
+      padding-left: max(1rem, env(safe-area-inset-left));
+      padding-right: max(1rem, env(safe-area-inset-right));
+    }
+    
+    .pwa-safe-y {
+      padding-top: max(1rem, env(safe-area-inset-top));
+      padding-bottom: max(1rem, env(safe-area-inset-bottom));
+    }
   }
 }
 
@@ -105,3 +189,13 @@
   border-radius: 4px;
   background: rgba(255, 255, 255, 0.2);
 }
+
+/* Grammar breakdown modal width constraint */
+.grammar-breakdown-backdrop {
+  --backdrop: rgba(0, 0, 0, 0.5);
+}
+
+#grammar-breakdown-portal > div > div {
+  --width: min(100%, 800px);
+}
+
