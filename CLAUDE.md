@@ -1,13 +1,13 @@
 # Manga Reader - Claude Code Memory
 
 ## 🎯 Project Overview
-Self-hosted manga reader web application for Japanese language learning. Microservices architecture with TypeScript frontend/backend and Python OCR services.
+Self-hosted manga reader web application for Japanese language learning. Microservices architecture with TypeScript frontend/backend and Python OCR services. Features Apple-level design polish with full PWA support and advanced touch interactions.
 
 ## 🏗️ Architecture
 
 ### Frontend - Port 5847
-- **Stack**: React 18 + TypeScript + Vite + shadcn/ui + react-zoom-pan-pinch + react-window
-- **Features**: Real-time OCR progress, WebSocket integration, 3 reading modes with custom scrolling
+- **Stack**: React 18 + TypeScript + Vite + shadcn/ui + framer-motion + react-zoom-pan-pinch + react-window
+- **Features**: Real-time OCR progress, WebSocket integration, 3 reading modes, Apple-style animations, PWA optimization
 
 ### Backend - Port 3847  
 - **Stack**: Elysia + Bun + SQLite + Prisma
@@ -91,15 +91,40 @@ GENERATE_DEBUG_IMAGES=true
 
 ## 🎮 Core Features
 
-- ✅ **PDF Upload**: Drag & drop with automatic JPG conversion
+- ✅ **PDF Upload**: Drag & drop with automatic JPG conversion (PDF and images only)
 - ✅ **OCR Processing**: Background queue with real-time progress
 - ✅ **Reader Interface**: RTL/LTR/scroll modes with zoom/pan
 - ✅ **Text Overlays**: Interactive Japanese text extraction
 - ✅ **AI Metadata**: OpenRouter API for author/description suggestions
 - ✅ **Debug Mode**: Visual OCR validation with bounding boxes
 - ✅ **WebSocket Updates**: Real-time status and progress
-- ✅ **Library Management**: Grid view with thumbnails
+- ✅ **Library Management**: Grid view with thumbnails and long-press edit mode
 - ✅ **Custom Scrolling**: Virtualized vertical scrolling with zoom/pan support
+- ✅ **Apple-Style UI**: Framer Motion animations, SF Pro typography, Apple design system
+- ✅ **Full PWA Support**: True edge-to-edge on iOS, dynamic status bar, notch embrace
+
+## 🎨 Design System
+
+### Apple-Inspired Design Language
+- **Typography**: SF Pro Display/Text with semantic size classes (apple-title-2, apple-body, etc.)
+- **Color System**: Semantic tokens with dark mode support
+- **Motion**: Framer Motion with spring physics (stiffness: 400-500, damping: 25-30)
+- **Touch Feedback**: Haptic feedback, iOS-style press states, gesture handling
+
+### Animation Patterns
+- **Card Interactions**: App Store-style bounce animations with scale and overshoot
+- **Page Transitions**: Cover-based transitions with backdrop blur
+- **Long Press**: iOS-native touch events with 500ms timeout, scroll gesture cancellation
+- **UI Transitions**: Staggered reveals, smooth slide-ins with proper easing
+
+### Typography Scale (Apple Human Interface Guidelines)
+```css
+.apple-title-2: 28px/34px, weight 700, tracking 0.36px
+.apple-headline: 17px/22px, weight 600, tracking -0.43px
+.apple-body: 17px/22px, weight 400, tracking -0.43px
+.apple-callout: 16px/21px, weight 400, tracking -0.32px
+.apple-caption-1: 12px/16px, weight 400, tracking 0px
+```
 
 ## 📖 Reading Modes
 
@@ -130,6 +155,90 @@ GENERATE_DEBUG_IMAGES=true
 - **Pinch**: Touch zoom with momentum
 - **Mouse Wheel**: Conditional behavior based on zoom level
 - **Text Overlays**: Synchronized transforms in all modes
+
+## 📱 iOS & PWA Optimizations
+
+### True Full-Screen PWA (iOS Notch Embrace)
+- **Viewport**: `initial-scale=1, viewport-fit=cover` with notch support
+- **Status Bar**: `black-translucent` for content behind status bar
+- **CSS Hack**: `min-height: calc(100% + env(safe-area-inset-top))` prevents white bars
+- **Safe Areas**: Automatic padding with `env(safe-area-inset-*)` values
+- **Dynamic Theme**: Reader mode uses black status bar, library uses accent color
+
+### PWA Implementation
+```css
+/* Full-screen PWA hack for iOS */
+@media (display-mode: standalone) {
+  html {
+    min-height: calc(100% + env(safe-area-inset-top));
+    padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+    background-attachment: fixed;
+  }
+}
+```
+
+### Advanced Touch Handling
+- **Scroll vs Tap Detection**: 10px movement threshold cancels navigation
+- **Long Press**: Native `onTouchStart/End/Move/Cancel` events for iOS compatibility
+- **Touch Movement Tracking**: Prevents accidental actions during scroll gestures
+- **Haptic Feedback**: `navigator.vibrate(50)` for tactile responses
+
+### iOS-Specific Optimizations
+- **Body Scroll Lock**: Complete isolation in Reader mode prevents library scroll bleed-through
+- **Touch Actions**: Disabled bounce scrolling, tap highlights, text selection
+- **Safe Areas**: PWA-only safe area padding using `@media (display-mode: standalone)`
+- **Viewport**: Dynamic viewport height (`100dvh`) for proper mobile sizing
+
+## 🎯 Library Interface
+
+### Card Interaction System
+- **Desktop**: Hover for edit/delete buttons with scale animations
+- **Mobile**: Long-press reveals sliding edit interface
+- **Animation Physics**: Dynamic button container height measurement
+- **Touch Safety**: Scroll gesture detection prevents accidental navigation
+
+### Long Press Edit Mode
+```typescript
+// iOS-compatible long press with gesture cancellation
+onTouchStart: Record touch position, start 500ms timeout
+onTouchMove: Cancel if movement > 10px (scroll detection)
+onTouchEnd: Navigate if no long press active and no scroll detected
+```
+
+### Cover Transition System
+- **App Store Style**: Full-screen cover overlay with backdrop blur
+- **Bottom Navigation**: Auto-hide during transitions with DOM detection
+- **Physics**: Spring animations with 400 stiffness, 25-30 damping
+- **Fallback**: Direct navigation for manga without thumbnails
+
+## 🎯 Text Overlay System
+
+### Smart Visibility
+- **Default**: Text boxes invisible (hover-only discovery)
+- **Grammar Mode**: Selected text block highlighted with green border
+- **Selective Highlighting**: Only clicked block remains visible during analysis
+- **State Management**: `selectedBlockIndex` tracks active text block across all components
+
+### Component Chain
+```
+Reader.tsx (selectedBlockIndex state)
+├── SwiperGallery/ScrollingGallery (pass props)
+└── SvgTextOverlay (render based on selection)
+```
+
+## 🔄 Scrolling Mode Technical Details
+
+### Height Calculation
+- **Constraint**: `Math.min(containerWidth * aspectRatio, windowHeight)`
+- **Dynamic Updates**: `resetAfterIndex(0, true)` when image dimensions load
+- **Gap Prevention**: Proper aspect ratio calculation eliminates spacing issues
+- **Dynamic Measurement**: Button containers measure actual height for perfect animations
+
+### Image Loading Timeline
+1. **Initial Render**: Uses default 1.4 aspect ratio
+2. **OCR Processing**: Real dimensions loaded into `scrollImageSizes`
+3. **Auto-Recalculation**: `useEffect` triggers list height updates
+4. **Final Layout**: All gaps resolved with actual image dimensions
 
 ## 📋 Database Schema
 
@@ -164,6 +273,8 @@ GENERATE_DEBUG_IMAGES=true
 - **Python Environment**: Use `.venv` not `venv` - path `../.venv/bin/activate`
 - **Debug Images**: Enable with `GENERATE_DEBUG_IMAGES=true`
 - **CORS**: API calls use Vite proxy (`/api/*` and `/uploads/*`)
+- **iOS Long Press**: Use native touch events, not framer-motion onLongPress
+- **PWA Status Bar**: Dynamic theme-color meta tag for proper iOS integration
 
 ## 🤝 Development Guidelines
 
@@ -172,6 +283,9 @@ GENERATE_DEBUG_IMAGES=true
 3. **TypeScript**: Strict typing, avoid `any` types
 4. **OCR Processing**: HTTP API calls only, no embedded Python
 5. **Git Submodules**: Use `git submodule update --remote` to update dependencies
+6. **Design System**: Follow Apple Human Interface Guidelines
+7. **Animations**: Use framer-motion with spring physics for natural feel
+8. **Touch Handling**: Implement scroll detection for mobile gesture safety
 
 ## 🤖 AI Integration
 
@@ -186,69 +300,21 @@ GENERATE_DEBUG_IMAGES=true
 - **Debug**: Green boxes + orange text overlay
 - **Storage**: `page-*_debug.jpg` in uploads
 
-## 📱 iOS & PWA Optimizations
+## 🏷️ Key Implementation Notes
 
-### Progressive Web App Support
-- **Manifest**: `/manifest.json` with standalone display mode
-- **Add to Home Screen**: Full app experience when launched from iOS home screen
-- **Navigation**: SPA routing keeps all navigation within single WebView
-- **Icons**: 192x192 and 512x512 PNG icons for home screen
+### File Format Support
+- **Supported**: PDF files and individual images (PNG, JPG, etc.)
+- **NOT Supported**: Archive formats (CBZ, CBR, ZIP, RAR) - backend doesn't handle these
+- **Import Interface**: Accurately reflects actual backend capabilities
 
-### iOS-Specific Optimizations
-- **Status Bar**: Black status bar with proper safe area handling
-- **Scrollbar Hiding**: Aggressive webkit scrollbar removal in Reader
-- **Touch Handling**: Disabled bounce scrolling, tap highlights, text selection
-- **Safe Areas**: PWA-only safe area padding using `@media (display-mode: standalone)`
-- **Viewport**: Dynamic viewport height (`100dvh`) for proper mobile sizing
+### Animation Architecture
+- **Gesture Conflicts**: Avoid whileTap with custom animations, use onTapStart/onTap pattern
+- **iOS Compatibility**: Native touch events required for reliable long press
+- **Physics**: Spring animations only support 2 keyframes, use phase-based animations for complex sequences
+- **Performance**: Use layoutId for smooth shared element transitions
 
-### Key CSS Classes
-```css
-.ios-full-height {
-  height: 100vh;
-  height: 100dvh;
-  overflow: hidden;
-  position: fixed;
-  touch-action: none;
-}
-
-@media (display-mode: standalone) {
-  .pwa-safe-bottom { padding-bottom: max(1rem, env(safe-area-inset-bottom)); }
-  .pwa-safe-top { padding-top: max(1rem, env(safe-area-inset-top)); }
-  .pwa-safe-x { padding-left/right: max(1rem, env(safe-area-inset-left/right)); }
-}
-```
-
-## 🎯 Text Overlay System
-
-### Smart Visibility
-- **Default**: Text boxes invisible (hover-only discovery)
-- **Grammar Mode**: Selected text block highlighted with green border
-- **Selective Highlighting**: Only clicked block remains visible during analysis
-- **State Management**: `selectedBlockIndex` tracks active text block across all components
-
-### Component Chain
-```
-Reader.tsx (selectedBlockIndex state)
-├── SwiperGallery/ScrollingGallery (pass props)
-└── SvgTextOverlay (render based on selection)
-```
-
-### Mobile Library Interaction
-- **Cover Tap**: Direct navigation to manga reader
-- **Title Tap**: Shows Edit/Delete buttons (mobile only)
-- **Responsive**: Desktop uses hover, mobile uses tap interaction
-- **Accessibility**: Large touch targets for mobile management actions
-
-## 🔄 Scrolling Mode Technical Details
-
-### Height Calculation
-- **Constraint**: `Math.min(containerWidth * aspectRatio, windowHeight)`
-- **Dynamic Updates**: `resetAfterIndex(0, true)` when image dimensions load
-- **Gap Prevention**: Proper aspect ratio calculation eliminates spacing issues
-- **First Page**: No special treatment, consistent with all other pages
-
-### Image Loading Timeline
-1. **Initial Render**: Uses default 1.4 aspect ratio
-2. **OCR Processing**: Real dimensions loaded into `scrollImageSizes`
-3. **Auto-Recalculation**: `useEffect` triggers list height updates
-4. **Final Layout**: All gaps resolved with actual image dimensions
+### PWA Best Practices
+- **Notch Embrace**: Full-screen experience with proper safe area handling
+- **Dynamic Status Bar**: Context-aware theme colors (black in reader, accent in library)
+- **Touch Optimization**: Comprehensive gesture detection and cancellation
+- **Body Scroll Lock**: Complete reader isolation prevents scroll bleed-through

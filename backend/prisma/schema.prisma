@@ -16,6 +16,7 @@ model Manga {
   description String?
   thumbnail   String?  // Path to thumbnail image
   currentPage Int      @default(0) // 0-based index of last read page
+  lastReadAt  DateTime? // Last time this manga was opened/read
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   

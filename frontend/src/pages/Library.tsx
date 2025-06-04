@@ -1,8 +1,10 @@
-import { useState, useEffect } from 'react'
-import { Link } from 'react-router-dom'
+import { useState, useEffect, useRef } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
+import { motion, AnimatePresence } from 'framer-motion'
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
 import { OcrStatusBlock } from '@/components/OcrStatusBlock'
+import { MangaCoverTransition } from '@/components/PageTransition'
 import { useToast } from '@/components/ui/use-toast'
 import { Plus, Book, Edit, Trash2, TestTube } from 'lucide-react'
 
@@ -32,12 +34,62 @@ export default function Library() {
   const [manga, setManga] = useState<MangaItem[]>([])
   const [loading, setLoading] = useState(true)
   const [ocrStatus, setOcrStatus] = useState<OcrCompletionStatus | null>(null)
+  const [showCoverTransition, setShowCoverTransition] = useState(false)
+  const [selectedCover, setSelectedCover] = useState<string | undefined>()
+  const [pendingNavigation, setPendingNavigation] = useState<string | null>(null)
+  const [isAnimatingCard, setIsAnimatingCard] = useState<string | null>(null)
+  const [animationPhase, setAnimationPhase] = useState<'idle' | 'press' | 'overshoot'>('idle')
+  const [isPressing, setIsPressing] = useState<string | null>(null)
+  const [longPressCard, setLongPressCard] = useState<string | null>(null)
+  const [hideBottomTabs, setHideBottomTabs] = useState(false)
+  const [longPressTimeout, setLongPressTimeout] = useState<number | null>(null)
+  const [buttonContainerHeight, setButtonContainerHeight] = useState(100)
+  const [touchStartPos, setTouchStartPos] = useState<{ x: number; y: number } | null>(null)
+  const buttonContainerRef = useRef<HTMLDivElement>(null)
   const { toast } = useToast()
+  const navigate = useNavigate()
 
   useEffect(() => {
     fetchManga()
     fetchOcrCompletionStatus()
+    
+    // Reset scroll position when navigating to library
+    window.scrollTo(0, 0)
   }, [])
+
+  // Dismiss long press mode when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (longPressCard && event.target instanceof Element) {
+        const cardElement = event.target.closest('[data-card-id]')
+        if (!cardElement || cardElement.getAttribute('data-card-id') !== longPressCard) {
+          setLongPressCard(null)
+        }
+      }
+    }
+
+    if (longPressCard) {
+      document.addEventListener('click', handleClickOutside)
+      return () => document.removeEventListener('click', handleClickOutside)
+    }
+  }, [longPressCard])
+
+  // Cleanup long press timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (longPressTimeout) {
+        clearTimeout(longPressTimeout)
+      }
+    }
+  }, [longPressTimeout])
+
+  // Measure button container height when it becomes visible
+  useEffect(() => {
+    if (longPressCard && buttonContainerRef.current) {
+      const height = buttonContainerRef.current.offsetHeight
+      setButtonContainerHeight(height)
+    }
+  }, [longPressCard])
 
   const fetchManga = async () => {
     try {
@@ -124,27 +176,28 @@ export default function Library() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Status bar with accent color background */}
-      <div className="bg-accent p-4">
-        <div className="max-w-6xl mx-auto">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-3xl font-bold text-accent-foreground">komu</h1>
-            </div>
-            <div className="flex gap-2">
-              <Link to="/upload">
-                <Button>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add Manga
-                </Button>
-              </Link>
-            </div>
-          </div>
+    <motion.div 
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.3, ease: [0.25, 0.46, 0.45, 0.94] }}
+      className="min-h-screen bg-background pb-20"
+    >
+      <div className="max-w-6xl mx-auto px-6 py-8">
+        <div className="mb-8">
+          <motion.h1 
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, ease: "easeOut" }}
+            className="apple-title-2 font-bold tracking-wider text-accent"
+            style={{
+              fontSize: '2.5rem',
+              letterSpacing: '0.15em',
+              fontWeight: '800'
+            }}
+          >
+            komu
+          </motion.h1>
         </div>
-      </div>
-      
-      <div className="max-w-6xl mx-auto p-4">
         {/* OCR Completion Status Block */}
         {ocrStatus && (
           <OcrStatusBlock
@@ -154,132 +207,412 @@ export default function Library() {
           />
         )}
 
-        {manga.length === 0 ? (
-          <div className="text-center py-12">
-            <div className="p-4 bg-muted/50 rounded-full w-16 h-16 mx-auto mb-4 flex items-center justify-center">
-              <Book className="h-8 w-8 text-muted-foreground" />
-            </div>
-            <h3 className="text-lg font-medium mb-2">No manga yet</h3>
-            <p className="text-muted-foreground mb-4">
-              Start building your library by uploading your first manga
-            </p>
-            <Link to="/upload">
-              <Button>
-                <Plus className="h-4 w-4 mr-2" />
-                Upload First Manga
-              </Button>
-            </Link>
-          </div>
-        ) : (
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
-            {manga.map((item) => (
-              <div key={item.id} className="group relative">
-                <div className="bg-card rounded-lg shadow-sm overflow-hidden border hover:shadow-md transition-shadow">
-                  {/* Cover image - direct link to reader */}
-                  <Link
-                    to={`/reader/${item.id}`}
-                    className="block aspect-[3/4] bg-muted relative overflow-hidden"
-                  >
-                    {item.thumbnail ? (
-                      <img
-                        src={item.thumbnail}
-                        alt={item.title}
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
-                      />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center">
-                        <Book className="h-12 w-12 text-muted-foreground" />
-                      </div>
-                    )}
-                  </Link>
-                  
-                  {/* Title and info area - shows edit/delete on mobile tap */}
-                  <div className="p-3 relative">
-                    <div 
-                      className="cursor-pointer md:cursor-default"
-                      onClick={(e) => {
-                        // On mobile, toggle edit buttons. On desktop, do nothing (hover handles it)
-                        if (window.innerWidth < 768) {
-                          const buttons = e.currentTarget.parentElement?.querySelector('.mobile-edit-buttons')
-                          if (buttons) {
-                            buttons.classList.toggle('hidden')
-                          }
+        <AnimatePresence mode="wait">
+          {manga.length === 0 ? (
+            <motion.div 
+              key="empty"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              className="text-center py-20"
+            >
+              <motion.div 
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                transition={{ delay: 0.2, type: "spring", stiffness: 200 }}
+                className="w-20 h-20 mx-auto mb-6 bg-surface-2 rounded-3xl flex items-center justify-center shadow-sm"
+              >
+                <Book className="h-10 w-10 text-text-secondary" />
+              </motion.div>
+              <motion.h3 
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 0.3 }}
+                className="apple-title-3 text-text-primary mb-3"
+              >
+                No manga yet
+              </motion.h3>
+              <motion.p 
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 0.4 }}
+                className="apple-body text-text-secondary mb-8 max-w-md mx-auto"
+              >
+                Start building your library by uploading your first manga
+              </motion.p>
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.5 }}
+              >
+                <Link to="/import">
+                  <Button className="apple-callout font-medium bg-accent hover:bg-accent/90 text-accent-foreground px-6 py-3 shadow-sm">
+                    <Plus className="h-4 w-4 mr-2" />
+                    Upload First Manga
+                  </Button>
+                </Link>
+              </motion.div>
+            </motion.div>
+          ) : (
+            <motion.div 
+              key="library"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6"
+            >
+              {manga.map((item, index) => (
+                <motion.div 
+                  key={item.id} 
+                  data-card-id={item.id}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: index * 0.05, duration: 0.4 }}
+                  className="group relative"
+                >
+                  <motion.div 
+                    whileHover={isAnimatingCard === item.id || isPressing === item.id ? {} : { y: -2, scale: 1.02 }}
+                    animate={{
+                      scale: isPressing === item.id ? 0.95 : 
+                             isAnimatingCard === item.id ? 
+                               (animationPhase === 'press' ? 0.95 : 
+                                animationPhase === 'overshoot' ? 1.05 : 1) : 1,
+                      y: isAnimatingCard === item.id || isPressing === item.id ? 0 : undefined
+                    }}
+                    onTouchStart={(e) => {
+                      const touch = e.touches[0]
+                      const startPos = { x: touch.clientX, y: touch.clientY }
+                      setTouchStartPos(startPos)
+                      setIsPressing(item.id)
+                      
+                      // iOS-compatible long press implementation
+                      const timeoutId = setTimeout(() => {
+                        setIsPressing(null)
+                        setLongPressCard(item.id)
+                        setLongPressTimeout(null)
+                        
+                        // Add haptic feedback on supported devices
+                        if (navigator.vibrate) {
+                          navigator.vibrate(50)
                         }
+                      }, 500) // 500ms for long press
+                      
+                      setLongPressTimeout(timeoutId)
+                    }}
+                    onTouchMove={(e) => {
+                      // Cancel long press if user starts scrolling
+                      if (touchStartPos && longPressTimeout) {
+                        const touch = e.touches[0]
+                        const deltaX = Math.abs(touch.clientX - touchStartPos.x)
+                        const deltaY = Math.abs(touch.clientY - touchStartPos.y)
+                        const movement = Math.sqrt(deltaX * deltaX + deltaY * deltaY)
+                        
+                        // If movement is more than 10px, cancel long press
+                        if (movement > 10) {
+                          clearTimeout(longPressTimeout)
+                          setLongPressTimeout(null)
+                          setIsPressing(null)
+                        }
+                      }
+                    }}
+                    onTouchEnd={(e) => {
+                      // Clear long press timeout
+                      if (longPressTimeout) {
+                        clearTimeout(longPressTimeout)
+                        setLongPressTimeout(null)
+                      }
+                      
+                      // If long press is active, don't dismiss it - let outside click handle that
+                      if (longPressCard === item.id) {
+                        setIsPressing(null)
+                        return
+                      }
+                      
+                      // Check if this was a scroll gesture by measuring movement
+                      if (touchStartPos && e.changedTouches[0]) {
+                        const touch = e.changedTouches[0]
+                        const deltaX = Math.abs(touch.clientX - touchStartPos.x)
+                        const deltaY = Math.abs(touch.clientY - touchStartPos.y)
+                        const movement = Math.sqrt(deltaX * deltaX + deltaY * deltaY)
+                        
+                        // If movement is more than 10px, treat as scroll and don't navigate
+                        if (movement > 10) {
+                          setIsPressing(null)
+                          setTouchStartPos(null)
+                          return
+                        }
+                      }
+                      
+                      setIsPressing(null)
+                      setTouchStartPos(null)
+                      
+                      // Normal tap behavior - trigger bounce and navigation
+                      if (isAnimatingCard) return
+                      
+                      setIsAnimatingCard(item.id)
+                      setAnimationPhase('overshoot')
+                      
+                      setTimeout(() => {
+                        setAnimationPhase('idle')
+                        
+                        setTimeout(() => {
+                          setHideBottomTabs(true)
+                          
+                          setTimeout(() => {
+                            if (item.thumbnail) {
+                              setSelectedCover(item.thumbnail)
+                              setPendingNavigation(`/reader/${item.id}`)
+                              setShowCoverTransition(true)
+                            } else {
+                              navigate(`/reader/${item.id}`)
+                            }
+                            
+                            setIsAnimatingCard(null)
+                            setAnimationPhase('idle')
+                          }, 150)
+                        }, 150)
+                      }, 150)
+                    }}
+                    onTouchCancel={() => {
+                      // Clear long press timeout on touch cancel
+                      if (longPressTimeout) {
+                        clearTimeout(longPressTimeout)
+                        setLongPressTimeout(null)
+                      }
+                      setIsPressing(null)
+                      setTouchStartPos(null)
+                    }}
+                    // Fallback for desktop - keep framer-motion handlers
+                    onTapStart={() => setIsPressing(item.id)}
+                    onTap={() => {
+                      setIsPressing(null)
+                      // Don't open manga if in long press mode - let outside click handle dismissal
+                      if (longPressCard === item.id) {
+                        return
+                      }
+                      
+                      // Normal tap behavior - trigger bounce and navigation
+                      if (isAnimatingCard) return
+                      
+                      setIsAnimatingCard(item.id)
+                      setAnimationPhase('overshoot')
+                      
+                      setTimeout(() => {
+                        setAnimationPhase('idle')
+                        
+                        setTimeout(() => {
+                          setHideBottomTabs(true)
+                          
+                          setTimeout(() => {
+                            if (item.thumbnail) {
+                              setSelectedCover(item.thumbnail)
+                              setPendingNavigation(`/reader/${item.id}`)
+                              setShowCoverTransition(true)
+                            } else {
+                              navigate(`/reader/${item.id}`)
+                            }
+                            
+                            setIsAnimatingCard(null)
+                            setAnimationPhase('idle')
+                          }, 150)
+                        }, 150)
+                      }, 150)
+                    }}
+                    onTapCancel={() => setIsPressing(null)}
+                    transition={{ 
+                      type: "spring",
+                      stiffness: 400,
+                      damping: 25
+                    }}
+                    className="bg-card rounded-2xl shadow-sm overflow-hidden border border-border/50 hover:shadow-lg hover:border-border select-none cursor-pointer"
+                    style={{ 
+                      WebkitUserSelect: 'none',
+                      WebkitTouchCallout: 'none',
+                      WebkitTapHighlightColor: 'transparent',
+                      touchAction: 'manipulation'
+                    }}
+                  >
+                    {/* Main card content - slides up on long press */}
+                    <motion.div 
+                      animate={{
+                        y: longPressCard === item.id ? -buttonContainerHeight : 0
                       }}
+                      transition={{ 
+                        type: "spring",
+                        stiffness: 400,
+                        damping: 30
+                      }}
+                      className="relative"
                     >
-                      <h3 className="font-medium text-sm mb-1 line-clamp-2">
-                        {item.title}
-                      </h3>
-                      <div className="text-xs text-muted-foreground space-y-1 mb-2">
-                        <div>
-                          {item.number ? `${item.type} ${item.number}` : `Unknown ${item.type}`}
+                      {/* Cover image */}
+                      <div className="block aspect-[3/4] bg-surface-2 relative overflow-hidden rounded-t-2xl">
+                        <div
+                          className="w-full h-full select-none"
+                          style={{ 
+                            touchAction: 'manipulation',
+                            WebkitUserSelect: 'none',
+                            WebkitTouchCallout: 'none',
+                            WebkitTapHighlightColor: 'transparent'
+                          }}
+                        >
+                          {item.thumbnail ? (
+                            <img
+                              src={item.thumbnail}
+                              alt={item.title}
+                              className="w-full h-full object-cover"
+                              loading="lazy"
+                            />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-surface-2 to-surface-3">
+                              <Book className="h-12 w-12 text-text-tertiary" />
+                            </div>
+                          )}
                         </div>
-                        <div className="line-clamp-1">
-                          {item.author || 'Unknown Author'}
-                        </div>
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/20 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
                       </div>
-                      {item.totalPages > 0 && (
-                        <div className="space-y-1">
-                          <div className="flex justify-between text-xs text-muted-foreground">
-                            <span>
-                              {item.progressPercent === 0 
-                                ? `${item.totalPages} pages` 
-                                : `Page ${item.currentPage + 1} of ${item.totalPages}`
-                              }
-                            </span>
-                            <span>{item.progressPercent}%</span>
-                          </div>
-                          <Progress value={item.progressPercent} className="h-1.5" />
-                        </div>
-                      )}
-                    </div>
                     
-                    {/* Mobile edit buttons - hidden by default, shown on title click */}
-                    <div className="mobile-edit-buttons hidden md:hidden mt-2 flex gap-2 justify-center">
-                      <Link to={`/metadata/${item.id}`}>
-                        <Button size="sm" variant="outline" className="flex-1">
-                          <Edit className="h-4 w-4 mr-1" />
-                          Edit
+                      {/* Title and info area */}
+                      <div className="p-4">
+                        <h3 className="apple-callout font-semibold text-text-primary mb-2 line-clamp-2 leading-tight">
+                          {item.title}
+                        </h3>
+                        <div className="space-y-1 mb-3">
+                          <div className="apple-caption-1 text-text-secondary">
+                            {item.number ? `${item.type} ${item.number}` : `Unknown ${item.type}`}
+                          </div>
+                          <div className="apple-caption-1 text-text-tertiary line-clamp-1">
+                            {item.author || 'Unknown Author'}
+                          </div>
+                        </div>
+                        {item.totalPages > 0 && (
+                          <div className="space-y-2">
+                            <div className="flex justify-between">
+                              <span className="apple-caption-2 text-text-secondary">
+                                {item.progressPercent === 0 
+                                  ? `${item.totalPages} pages` 
+                                  : `Page ${item.currentPage + 1} of ${item.totalPages}`
+                                }
+                              </span>
+                              <span className="apple-caption-2 font-medium text-text-primary">
+                                {item.progressPercent}%
+                              </span>
+                            </div>
+                            <Progress 
+                              value={item.progressPercent} 
+                              className="h-1.5 bg-surface-3" 
+                            />
+                          </div>
+                        )}
+                      </div>
+                    </motion.div>
+
+                    {/* Long press edit buttons - slide in from bottom */}
+                    <motion.div
+                      ref={buttonContainerRef}
+                      initial={{ y: buttonContainerHeight, opacity: 0 }}
+                      animate={{
+                        y: longPressCard === item.id ? 0 : buttonContainerHeight,
+                        opacity: longPressCard === item.id ? 1 : 0
+                      }}
+                      transition={{ 
+                        type: "spring",
+                        stiffness: 400,
+                        damping: 30
+                      }}
+                      className="absolute bottom-0 left-0 right-0 p-3 bg-surface-1/95 backdrop-blur-sm rounded-b-2xl shadow-sm border-l border-r border-b border-border/50"
+                    >
+                      <div className="space-y-2">
+                        <Link to={`/metadata/${item.id}`} className="block w-full">
+                          <motion.div
+                            whileHover={{ scale: 1.02 }}
+                            whileTap={{ scale: 0.98 }}
+                            className="w-full"
+                          >
+                            <Button 
+                              variant="outline" 
+                              className="w-full apple-body font-medium border-border/50 hover:border-border justify-center"
+                            >
+                              <Edit className="h-4 w-4 mr-2" />
+                              Edit Metadata
+                            </Button>
+                          </motion.div>
+                        </Link>
+                        <motion.div
+                          whileHover={{ scale: 1.02 }}
+                          whileTap={{ scale: 0.98 }}
+                          className="w-full"
+                        >
+                          <Button 
+                            variant="destructive"
+                            className="w-full apple-body font-medium justify-center"
+                            onClick={() => {
+                              setLongPressCard(null)
+                              deleteManga(item.id, item.title)
+                            }}
+                          >
+                            <Trash2 className="h-4 w-4 mr-2" />
+                            Delete Manga
+                          </Button>
+                        </motion.div>
+                      </div>
+                    </motion.div>
+                  </motion.div>
+                
+                  {/* Refined desktop hover buttons */}
+                  <motion.div 
+                    initial={{ opacity: 0, scale: 0.8 }}
+                    whileHover={{ opacity: 1, scale: 1 }}
+                    className="hidden md:flex absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-all duration-200 gap-2"
+                  >
+                    <Link to={`/metadata/${item.id}`}>
+                      <motion.div
+                        whileHover={{ scale: 1.1 }}
+                        whileTap={{ scale: 0.95 }}
+                      >
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          className="h-9 w-9 p-0 bg-surface-1/90 hover:bg-surface-1 text-text-primary border border-border/50 shadow-sm backdrop-blur-sm"
+                        >
+                          <Edit className="h-4 w-4" />
                         </Button>
-                      </Link>
-                      <Button 
-                        size="sm" 
+                      </motion.div>
+                    </Link>
+                    <motion.div
+                      whileHover={{ scale: 1.1 }}
+                      whileTap={{ scale: 0.95 }}
+                    >
+                      <Button
+                        size="sm"
                         variant="destructive"
-                        className="flex-1"
+                        className="h-9 w-9 p-0 shadow-sm backdrop-blur-sm"
                         onClick={() => deleteManga(item.id, item.title)}
                       >
-                        <Trash2 className="h-4 w-4 mr-1" />
-                        Delete
+                        <Trash2 className="h-4 w-4" />
                       </Button>
-                    </div>
-                  </div>
-                </div>
-                
-                {/* Desktop hover buttons - only visible on desktop */}
-                <div className="hidden md:flex absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity gap-1">
-                  <Link to={`/metadata/${item.id}`}>
-                    <Button
-                      size="sm"
-                      variant="secondary"
-                      className="h-8 w-8 p-0 bg-black/50 hover:bg-black/70 text-white border-0"
-                    >
-                      <Edit className="h-4 w-4" />
-                    </Button>
-                  </Link>
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    className="h-8 w-8 p-0 bg-red-500/70 hover:bg-red-500/90 text-white border-0"
-                    onClick={() => deleteManga(item.id, item.title)}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
+                    </motion.div>
+                  </motion.div>
+                </motion.div>
+              ))}
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
-    </div>
+      
+      {/* Manga Cover Transition */}
+      <MangaCoverTransition
+        coverImage={selectedCover}
+        isOpen={showCoverTransition}
+        onComplete={() => {
+          setShowCoverTransition(false)
+          if (pendingNavigation) {
+            navigate(pendingNavigation)
+            setPendingNavigation(null)
+          }
+          setSelectedCover(undefined)
+          setHideBottomTabs(false) // Reset bottom tabs state
+        }}
+      />
+    </motion.div>
   )
 }

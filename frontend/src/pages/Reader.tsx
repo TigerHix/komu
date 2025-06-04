@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
+import { motion, AnimatePresence } from 'framer-motion'
 import { Button } from '@/components/ui/button'
+import { MangaCoverTransition } from '@/components/PageTransition'
 import { ArrowLeft, Settings, Loader2, Monitor, BookOpen, Scroll, Bug } from 'lucide-react'
 import { GrammarBreakdown } from '@/components/GrammarBreakdown'
 import { SwiperGallery } from '@/components/SwiperGallery'
@@ -29,6 +31,7 @@ export default function Reader() {
     return (localStorage.getItem('readingMode') as ReadingMode) || 'rtl'
   })
   const [showSettings, setShowSettings] = useState(false)
+  const settingsRef = useRef<HTMLDivElement>(null)
   
   
   // Grammar breakdown states
@@ -37,8 +40,18 @@ export default function Reader() {
   const [grammarAnalysisLoading, setGrammarAnalysisLoading] = useState(false)
   const [selectedSentence, setSelectedSentence] = useState('')
   const [selectedBlockIndex, setSelectedBlockIndex] = useState<number | null>(null)
+  const [showExitTransition, setShowExitTransition] = useState(false)
+  const [progressBarValue, setProgressBarValue] = useState(() => {
+    if (urlPage) {
+      const pageNum = parseInt(urlPage, 10) - 1 // Convert to 0-based index
+      return isNaN(pageNum) ? 0 : Math.max(0, pageNum)
+    }
+    return 0
+  })
   
   const progressUpdateTimeoutRef = useRef<number | null>(null)
+  const progressBarDebounceRef = useRef<number | null>(null)
+  const isProgressBarDragging = useRef(false)
 
   // URL sync function
   const updateURL = useCallback((pageNum: number) => {
@@ -92,6 +105,32 @@ export default function Reader() {
     onPageChange: handlePageChange
   })
 
+  // Debounced page change function - this handles ALL side effects
+  const debouncedPageChange = useCallback((pageNum: number) => {
+    isProgressBarDragging.current = true
+    
+    // Clear existing debounce timeout
+    if (progressBarDebounceRef.current) {
+      clearTimeout(progressBarDebounceRef.current)
+    }
+    
+    // Set new timeout for debounced page change (includes URL, OCR, progress tracking)
+    progressBarDebounceRef.current = setTimeout(() => {
+      isProgressBarDragging.current = false
+      setCurrentPage(pageNum)
+      handlePageChange()
+    }, 300) // 300ms debounce as requested
+  }, [handlePageChange])
+
+  // Progress bar handler - immediate UI update, debounced everything else
+  const handleProgressBarChange = useCallback((newPage: number) => {
+    // Only immediate UI updates
+    setProgressBarValue(newPage)
+    
+    // Debounced actual page change (triggers OCR, URL, etc.)
+    debouncedPageChange(newPage)
+  }, [debouncedPageChange])
+
   // Handle text block clicks for grammar analysis
   const handleBlockClick = useCallback(async (block: TextBlock, index: number) => {
     const text = block.text?.trim()
@@ -128,24 +167,51 @@ export default function Reader() {
     setSelectedBlockIndex(null)
   }, [])
 
-  // Prevent body scroll when grammar breakdown is open (PWA fix)
+  // Lock body scroll completely when in reader mode
+  useEffect(() => {
+    // Always lock body scroll in reader to prevent library scroll bleed-through
+    const originalOverflow = document.body.style.overflow
+    const originalPosition = document.body.style.position
+    const originalWidth = document.body.style.width
+    const originalHeight = document.body.style.height
+    
+    document.body.style.overflow = 'hidden'
+    document.body.style.position = 'fixed'
+    document.body.style.width = '100%'
+    document.body.style.height = '100%'
+    
+    return () => {
+      // Restore original styles when leaving reader
+      document.body.style.overflow = originalOverflow
+      document.body.style.position = originalPosition
+      document.body.style.width = originalWidth
+      document.body.style.height = originalHeight
+    }
+  }, [])
+
+  // Additional body scroll lock when grammar breakdown is open
   useEffect(() => {
     if (showGrammarBreakdown) {
       document.body.style.overflow = 'hidden'
       document.body.style.position = 'fixed'
       document.body.style.width = '100%'
-    } else {
-      document.body.style.overflow = ''
-      document.body.style.position = ''
-      document.body.style.width = ''
-    }
-    
-    return () => {
-      document.body.style.overflow = ''
-      document.body.style.position = ''
-      document.body.style.width = ''
+      document.body.style.height = '100%'
     }
   }, [showGrammarBreakdown])
+
+  // Handle click outside settings popup
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (settingsRef.current && !settingsRef.current.contains(event.target as Node)) {
+        setShowSettings(false)
+      }
+    }
+
+    if (showSettings) {
+      document.addEventListener('mousedown', handleClickOutside)
+      return () => document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [showSettings])
 
   // Debug handler
   const handleDebug = useCallback(() => {
@@ -160,9 +226,18 @@ export default function Reader() {
     localStorage.setItem('readingMode', readingMode)
   }, [readingMode])
 
-  // Sync URL when page changes
+  // Sync progressBarValue when currentPage changes from other sources (not progress bar)
   useEffect(() => {
-    if (manga && currentPage >= 0 && currentPage < manga.pages.length) {
+    if (!isProgressBarDragging.current) {
+      setProgressBarValue(currentPage)
+    }
+    // If user is dragging, keep progressBarValue as-is (shows drag position)
+    // It will sync after the debounce completes
+  }, [currentPage])
+
+  // Sync URL when page changes (but skip if it's from progress bar drag)
+  useEffect(() => {
+    if (manga && currentPage >= 0 && currentPage < manga.pages.length && !isProgressBarDragging.current) {
       updateURL(currentPage)
     }
   }, [currentPage, manga, updateURL])
@@ -180,6 +255,9 @@ export default function Reader() {
       if (progressUpdateTimeoutRef.current) {
         clearTimeout(progressUpdateTimeoutRef.current)
       }
+      if (progressBarDebounceRef.current) {
+        clearTimeout(progressBarDebounceRef.current)
+      }
     }
   }, [])
 
@@ -189,6 +267,11 @@ export default function Reader() {
       if (response.ok) {
         const data = await response.json()
         setManga(data)
+        
+        // Update lastReadAt timestamp when manga is opened
+        fetch(`/api/manga/${id}/last-read`, {
+          method: 'PUT'
+        }).catch(error => console.error('Failed to update last read timestamp:', error))
         
         // Determine which page to show
         let targetPage = 0
@@ -258,6 +341,52 @@ export default function Reader() {
     setShowSettings(false)
   }, [readingMode, ocrService.resetAllOcrData])
 
+  // Auto-close settings when toolbar/UI is hidden
+  useEffect(() => {
+    if (!showUI && showSettings) {
+      setShowSettings(false)
+    }
+  }, [showUI, showSettings])
+
+  // Dynamic theme color for PWA status bar
+  useEffect(() => {
+    // Check if we're in a PWA
+    const isPWA = window.matchMedia('(display-mode: standalone)').matches || 
+                  window.navigator.standalone === true
+
+    if (isPWA) {
+      let themeColorMeta = document.querySelector('meta[name="theme-color"]')
+      
+      if (!themeColorMeta) {
+        themeColorMeta = document.createElement('meta')
+        themeColorMeta.setAttribute('name', 'theme-color')
+        document.head.appendChild(themeColorMeta)
+      }
+
+      // Set theme color based on UI visibility in reader
+      if (showUI) {
+        // Dark overlay color when UI is visible
+        themeColorMeta.setAttribute('content', 'rgba(0, 0, 0, 0.8)')
+      } else {
+        // Pure black to match manga background for seamless integration
+        themeColorMeta.setAttribute('content', '#000000')
+      }
+    }
+
+    // Cleanup function to reset on unmount
+    return () => {
+      const isPWA = window.matchMedia('(display-mode: standalone)').matches || 
+                    window.navigator.standalone === true
+      if (isPWA) {
+        const themeColorMeta = document.querySelector('meta[name="theme-color"]')
+        if (themeColorMeta) {
+          themeColorMeta.setAttribute('content', 'hsl(142, 65%, 28%)') // Reset to original accent color
+        }
+      }
+    }
+  }, [showUI])
+
+
   if (loading) {
     return (
       <div className="min-h-screen bg-black flex items-center justify-center">
@@ -322,115 +451,187 @@ export default function Reader() {
     <div 
       className="ios-full-height bg-black relative overflow-hidden ios-user-select-none ios-touch-callout-none ios-tap-highlight-transparent ios-no-bounce"
     >
-      {/* Header */}
-      <div className={`
-        absolute top-0 left-0 right-0 z-10 bg-black/50 backdrop-blur-sm p-4 pwa-safe-top pwa-safe-x
-        transition-opacity duration-300
-        ${showUI ? 'opacity-100' : 'opacity-0 pointer-events-none'}
-      `}>
-        <div className="flex items-center justify-between text-white">
-          <div className="flex items-center space-x-4">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => navigate(-1)}
-              className="text-white hover:bg-white/20"
-            >
-              <ArrowLeft className="h-4 w-4" />
-            </Button>
-            <div>
-              <h1 className="font-medium">{manga.title}</h1>
-            </div>
-          </div>
-          <div className="flex items-center space-x-2">
-            {currentPageData && ocrService.pageOcrStatus[currentPageData.id] === 'PROCESSING' && (
-              <div className="flex items-center text-white/70 text-sm">
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                Processing page...
+      {/* Refined Header with Apple-level polish */}
+      <AnimatePresence>
+        {showUI && (
+          <motion.div 
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            transition={{ duration: 0.3, ease: "easeOut" }}
+            className="absolute top-0 left-0 right-0 z-10 bg-overlay backdrop-blur-xl"
+          >
+            <div className="px-6 py-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-4">
+                  <motion.div
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                  >
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        // Check if we have a cover image for reverse transition
+                        const coverImage = manga?.pages?.[0]?.imagePath
+                        if (coverImage) {
+                          setShowExitTransition(true)
+                        } else {
+                          navigate(-1)
+                        }
+                      }}
+                      className="text-white/90 hover:text-white hover:bg-white/20 p-2 rounded-xl transition-all duration-200"
+                    >
+                      <ArrowLeft className="h-5 w-5" />
+                    </Button>
+                  </motion.div>
+                  <div className="min-w-0 flex-1">
+                    <h1 className="apple-headline text-white font-semibold truncate">{manga.title}</h1>
+                    <p className="apple-caption-1 text-white/70 mt-0.5">Page {currentPage + 1} of {manga.pages.length}</p>
+                  </div>
+                </div>
+                <div className="flex items-center space-x-3">
+                  <AnimatePresence>
+                    {currentPageData && ocrService.pageOcrStatus[currentPageData.id] === 'PROCESSING' && (
+                      <motion.div 
+                        initial={{ opacity: 0, scale: 0.8 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.8 }}
+                        className="flex items-center text-white/70 apple-caption-1"
+                      >
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Processing...
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                  <motion.div
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                  >
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setShowSettings(!showSettings)}
+                      className="text-white/90 hover:text-white hover:bg-white/20 p-2 rounded-xl transition-all duration-200"
+                    >
+                      <Settings className="h-5 w-5" />
+                    </Button>
+                  </motion.div>
+                </div>
               </div>
-            )}
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setShowSettings(!showSettings)}
-              className="text-white hover:bg-white/20"
-            >
-              <Settings className="h-4 w-4" />
-            </Button>
-          </div>
-        </div>
-      </div>
-
-      {/* Settings Popup */}
-      {showSettings && (
-        <div className="absolute top-16 right-4 z-20 bg-black/90 backdrop-blur-sm rounded-lg p-4 border border-white/20">
-          <div className="text-white space-y-3">
-            <h3 className="font-medium mb-3">Reading Mode</h3>
-            <div className="space-y-2">
-              <Button
-                variant={readingMode === 'rtl' ? 'default' : 'ghost'}
-                size="sm"
-                onClick={() => setReadingMode('rtl')}
-                className="w-full justify-start text-white hover:bg-white/20"
-              >
-                <BookOpen className="h-4 w-4 mr-2" />
-                Right to Left (RTL)
-              </Button>
-              <Button
-                variant={readingMode === 'ltr' ? 'default' : 'ghost'}
-                size="sm"
-                onClick={() => setReadingMode('ltr')}
-                className="w-full justify-start text-white hover:bg-white/20"
-              >
-                <Monitor className="h-4 w-4 mr-2" />
-                Left to Right (LTR)
-              </Button>
-              <Button
-                variant={readingMode === 'scrolling' ? 'default' : 'ghost'}
-                size="sm"
-                onClick={() => setReadingMode('scrolling')}
-                className="w-full justify-start text-white hover:bg-white/20"
-              >
-                <Scroll className="h-4 w-4 mr-2" />
-                Continuous Scrolling
-              </Button>
             </div>
-          </div>
-        </div>
-      )}
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Refined Settings Popup */}
+      <AnimatePresence>
+        {showSettings && (
+          <motion.div 
+            ref={settingsRef}
+            initial={{ opacity: 0, scale: 0.9, y: -10 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.9, y: -10 }}
+            transition={{ duration: 0.2, ease: "easeOut" }}
+            className="absolute top-20 right-6 z-20 bg-surface-1/95 backdrop-blur-xl rounded-2xl border border-border/20 shadow-xl overflow-hidden"
+          >
+            <div className="p-6 min-w-[240px]">
+              <h3 className="apple-headline text-text-primary font-semibold mb-4">Reading Mode</h3>
+              <div className="space-y-2">
+                <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
+                  <Button
+                    variant={readingMode === 'rtl' ? 'default' : 'ghost'}
+                    size="sm"
+                    onClick={() => setReadingMode('rtl')}
+                    className={`w-full justify-start apple-callout font-medium transition-all duration-200 rounded-xl h-12 ${
+                      readingMode === 'rtl' 
+                        ? 'bg-accent text-accent-foreground shadow-sm' 
+                        : 'text-text-primary hover:bg-surface-2'
+                    }`}
+                  >
+                    <BookOpen className="h-4 w-4 mr-3" />
+                    Right to Left (RTL)
+                  </Button>
+                </motion.div>
+                <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
+                  <Button
+                    variant={readingMode === 'ltr' ? 'default' : 'ghost'}
+                    size="sm"
+                    onClick={() => setReadingMode('ltr')}
+                    className={`w-full justify-start apple-callout font-medium transition-all duration-200 rounded-xl h-12 ${
+                      readingMode === 'ltr' 
+                        ? 'bg-accent text-accent-foreground shadow-sm' 
+                        : 'text-text-primary hover:bg-surface-2'
+                    }`}
+                  >
+                    <Monitor className="h-4 w-4 mr-3" />
+                    Left to Right (LTR)
+                  </Button>
+                </motion.div>
+                <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
+                  <Button
+                    variant={readingMode === 'scrolling' ? 'default' : 'ghost'}
+                    size="sm"
+                    onClick={() => setReadingMode('scrolling')}
+                    className={`w-full justify-start apple-callout font-medium transition-all duration-200 rounded-xl h-12 ${
+                      readingMode === 'scrolling' 
+                        ? 'bg-accent text-accent-foreground shadow-sm' 
+                        : 'text-text-primary hover:bg-surface-2'
+                    }`}
+                  >
+                    <Scroll className="h-4 w-4 mr-3" />
+                    Continuous Scrolling
+                  </Button>
+                </motion.div>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Main Content */}
       {renderContent()}
 
-      {/* Navigation Footer */}
-      <div className={`
-        absolute bottom-0 left-0 right-0 z-10 bg-black/50 backdrop-blur-sm p-4 pwa-safe-bottom pwa-safe-x
-        transition-opacity duration-300
-        ${showUI ? 'opacity-100' : 'opacity-0 pointer-events-none'}
-      `}>
-        <div className="flex items-center space-x-4">
-          <div className="text-white text-sm font-medium min-w-fit">
-            {currentPage + 1} / {manga.pages.length}
-          </div>
-          
-          <div className="flex-1">
-            <input
-              type="range"
-              min="0"
-              max={manga.pages.length - 1}
-              value={currentPage}
-              onChange={(e) => {
-                const newPage = parseInt(e.target.value)
-                navigation.goToPage(newPage)
-              }}
-              className="w-full h-2 bg-white/20 rounded-full appearance-none cursor-default slider"
-              style={{
-                background: `linear-gradient(to right, #ffffff 0%, #ffffff ${((currentPage + 1) / manga.pages.length) * 100}%, rgba(255,255,255,0.2) ${((currentPage + 1) / manga.pages.length) * 100}%, rgba(255,255,255,0.2) 100%)`
-              }}
-            />
-          </div>
-        </div>
-      </div>
+      {/* Refined Navigation Footer */}
+      <AnimatePresence>
+        {showUI && (
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 20 }}
+            transition={{ duration: 0.3, ease: "easeOut" }}
+            className="absolute bottom-0 left-0 right-0 z-10 bg-overlay backdrop-blur-xl pwa-safe-bottom"
+          >
+            <div className="px-6 py-4">
+              <div className="flex items-center space-x-4">
+                <div className="text-white apple-caption-1 font-medium min-w-fit bg-white/10 px-3 py-1.5 rounded-full">
+                  {progressBarValue + 1} / {manga.pages.length}
+                </div>
+                
+                <div className="flex flex-1 relative">
+                  <input
+                    type="range"
+                    min="0"
+                    max={manga.pages.length - 1}
+                    value={readingMode === 'rtl' ? manga.pages.length - 1 - progressBarValue : progressBarValue}
+                    onChange={(e) => {
+                      const sliderValue = parseInt(e.target.value)
+                      const newPage = readingMode === 'rtl' ? manga.pages.length - 1 - sliderValue : sliderValue
+                      handleProgressBarChange(newPage)
+                    }}
+                    className="w-full h-2 bg-white/20 rounded-full appearance-none cursor-default slider transition-all duration-200 hover:h-3"
+                    style={{
+                      background: readingMode === 'rtl' 
+                        ? `linear-gradient(to left, hsl(var(--accent)) 0%, hsl(var(--accent)) ${((progressBarValue + 1) / manga.pages.length) * 100}%, rgba(255,255,255,0.2) ${((progressBarValue + 1) / manga.pages.length) * 100}%, rgba(255,255,255,0.2) 100%)`
+                        : `linear-gradient(to right, hsl(var(--accent)) 0%, hsl(var(--accent)) ${((progressBarValue + 1) / manga.pages.length) * 100}%, rgba(255,255,255,0.2) ${((progressBarValue + 1) / manga.pages.length) * 100}%, rgba(255,255,255,0.2) 100%)`
+                    }}
+                  />
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Grammar Breakdown Modal */}
       <GrammarBreakdown
@@ -441,6 +642,17 @@ export default function Reader() {
       />
 
       <div id="grammar-breakdown-portal"></div>
+      
+      {/* Exit Transition */}
+      <MangaCoverTransition
+        coverImage={manga?.pages?.[0]?.imagePath}
+        isOpen={showExitTransition}
+        isReversed={true}
+        onComplete={() => {
+          setShowExitTransition(false)
+          navigate(-1)
+        }}
+      />
     </div>
   )
 }

@@ -1,53 +1,101 @@
-@import url('https://fonts.googleapis.com/css2?family=Nunito:wght@200..1000&family=Kosugi+Maru&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Kosugi+Maru&display=swap');
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
+  /* PWA Full-Screen Hack for iOS - Embrace the notch */
+  @media (display-mode: standalone) {
+    html {
+      min-height: calc(100% + env(safe-area-inset-top));
+      padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+      background-attachment: fixed;
+    }
+  }
+
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    /* Apple-inspired color system */
+    --background: 0 0% 98.8%; /* Warm off-white like iOS */
+    --foreground: 220 9% 11%; /* Rich dark text */
+    
     --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    --card-foreground: 220 9% 11%;
+    
     --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
-    --primary: 222.2 47.4% 11.2%;
-    --primary-foreground: 210 40% 98%;
-    --secondary: 210 40% 96%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
-    --muted: 210 40% 96%;
-    --muted-foreground: 215.4 16.3% 46.9%;
-    --accent: 98 23% 65%; /* rgb(168, 198, 134) converted to HSL */
-    --accent-foreground: 222.2 47.4% 11.2%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
-    --radius: 0.5rem;
+    --popover-foreground: 220 9% 11%;
+    
+    --primary: 220 100% 50%; /* Apple blue */
+    --primary-foreground: 0 0% 100%;
+    
+    --secondary: 217 10% 96%; /* Subtle gray background */
+    --secondary-foreground: 220 9% 11%;
+    
+    --muted: 217 10% 95%; /* Very light gray */
+    --muted-foreground: 220 6% 46%; /* Medium gray text */
+    
+    --accent: 142 65% 28%; /* Darker matcha green */
+    --accent-foreground: 0 0% 100%;
+    
+    --destructive: 0 100% 50%; /* Apple red */
+    --destructive-foreground: 0 0% 100%;
+    
+    --border: 217 10% 89%; /* Subtle borders */
+    --input: 217 10% 89%;
+    --ring: 220 100% 50%; /* Focus ring matches primary */
+    
+    --radius: 12px; /* Apple-like radius */
+    
+    /* Additional semantic colors */
+    --surface-1: 0 0% 100%;
+    --surface-2: 217 10% 98%;
+    --surface-3: 217 10% 95%;
+    
+    --text-primary: 220 9% 11%;
+    --text-secondary: 220 6% 46%;
+    --text-tertiary: 220 6% 65%;
+    
+    --overlay: 220 9% 11% / 0.3;
   }
 
   .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
-    --primary: 210 40% 98%;
-    --primary-foreground: 222.2 47.4% 11.2%;
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-    --accent: 98 23% 65%; /* Same accent color for dark mode */
-    --accent-foreground: 222.2 47.4% 11.2%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 212.7 26.8% 83.9%;
+    --background: 220 13% 6%; /* Rich dark background */
+    --foreground: 0 0% 98%;
+    
+    --card: 220 13% 9%;
+    --card-foreground: 0 0% 98%;
+    
+    --popover: 220 13% 9%;
+    --popover-foreground: 0 0% 98%;
+    
+    --primary: 220 100% 60%; /* Brighter blue for dark mode */
+    --primary-foreground: 220 13% 6%;
+    
+    --secondary: 220 13% 15%; /* Dark gray surface */
+    --secondary-foreground: 0 0% 98%;
+    
+    --muted: 220 13% 15%;
+    --muted-foreground: 220 6% 65%;
+    
+    --accent: 142 55% 35%; /* Darker matcha green for dark mode */
+    --accent-foreground: 220 13% 6%;
+    
+    --destructive: 0 86% 59%; /* Apple red for dark */
+    --destructive-foreground: 0 0% 98%;
+    
+    --border: 220 13% 20%;
+    --input: 220 13% 20%;
+    --ring: 220 100% 60%;
+    
+    --surface-1: 220 13% 9%;
+    --surface-2: 220 13% 12%;
+    --surface-3: 220 13% 15%;
+    
+    --text-primary: 0 0% 98%;
+    --text-secondary: 220 6% 65%;
+    --text-tertiary: 220 6% 46%;
+    
+    --overlay: 0 0% 0% / 0.5;
   }
 }
 
@@ -57,7 +105,82 @@
   }
   body {
     @apply bg-background text-foreground;
-    font-family: 'Nunito', 'Kosugi Maru', sans-serif;
+    font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Helvetica Neue', Helvetica, Arial, 'Kosugi Maru', sans-serif;
+    font-feature-settings: 'kern' 1, 'liga' 1, 'calt' 1;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* Apple Typography Scale */
+  .apple-title-1 {
+    font-size: 34px;
+    line-height: 41px;
+    font-weight: 700;
+    letter-spacing: 0.37px;
+  }
+
+  .apple-title-2 {
+    font-size: 28px;
+    line-height: 34px;
+    font-weight: 700;
+    letter-spacing: 0.36px;
+  }
+
+  .apple-title-3 {
+    font-size: 22px;
+    line-height: 28px;
+    font-weight: 600;
+    letter-spacing: 0.35px;
+  }
+
+  .apple-headline {
+    font-size: 17px;
+    line-height: 22px;
+    font-weight: 600;
+    letter-spacing: -0.43px;
+  }
+
+  .apple-body {
+    font-size: 17px;
+    line-height: 22px;
+    font-weight: 400;
+    letter-spacing: -0.43px;
+  }
+
+  .apple-callout {
+    font-size: 16px;
+    line-height: 21px;
+    font-weight: 400;
+    letter-spacing: -0.32px;
+  }
+
+  .apple-subhead {
+    font-size: 15px;
+    line-height: 20px;
+    font-weight: 400;
+    letter-spacing: -0.24px;
+  }
+
+  .apple-footnote {
+    font-size: 13px;
+    line-height: 18px;
+    font-weight: 400;
+    letter-spacing: -0.08px;
+  }
+
+  .apple-caption-1 {
+    font-size: 12px;
+    line-height: 16px;
+    font-weight: 400;
+    letter-spacing: 0px;
+  }
+
+  .apple-caption-2 {
+    font-size: 11px;
+    line-height: 13px;
+    font-weight: 400;
+    letter-spacing: 0.07px;
   }
 }
 
@@ -145,49 +268,62 @@
   }
 }
 
-/* Custom slider styles */
+/* Apple-inspired slider styles */
 .slider::-webkit-slider-thumb {
   appearance: none;
-  height: 16px;
-  width: 16px;
+  height: 20px;
+  width: 20px;
   border-radius: 50%;
-  background: #ffffff;
+  background: hsl(var(--accent));
   cursor: default;
-  border: 2px solid #ffffff;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+  border: 3px solid #ffffff;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2), 0 1px 3px rgba(0, 0, 0, 0.1);
+  transition: all 0.2s ease;
 }
 
 .slider::-webkit-slider-thumb:hover {
-  background: #f0f0f0;
+  background: hsl(var(--accent) / 0.9);
   transform: scale(1.1);
-  transition: all 0.2s ease;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25), 0 2px 6px rgba(0, 0, 0, 0.15);
+}
+
+.slider::-webkit-slider-thumb:active {
+  transform: scale(1.2);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3), 0 1px 3px rgba(0, 0, 0, 0.2);
 }
 
 .slider::-moz-range-thumb {
-  height: 16px;
-  width: 16px;
+  height: 20px;
+  width: 20px;
   border-radius: 50%;
-  background: #ffffff;
+  background: hsl(var(--accent));
   cursor: default;
-  border: 2px solid #ffffff;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
-}
-
-.slider::-moz-range-thumb:hover {
-  background: #f0f0f0;
-  transform: scale(1.1);
+  border: 3px solid #ffffff;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2), 0 1px 3px rgba(0, 0, 0, 0.1);
   transition: all 0.2s ease;
 }
 
+.slider::-moz-range-thumb:hover {
+  background: hsl(var(--accent) / 0.9);
+  transform: scale(1.1);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25), 0 2px 6px rgba(0, 0, 0, 0.15);
+}
+
 .slider::-webkit-slider-track {
-  height: 8px;
-  border-radius: 4px;
+  height: 4px;
+  border-radius: 2px;
 }
 
 .slider::-moz-range-track {
-  height: 8px;
-  border-radius: 4px;
+  height: 4px;
+  border-radius: 2px;
   background: rgba(255, 255, 255, 0.2);
+}
+
+/* Fix progress bar alignment */
+.slider {
+  vertical-align: bottom;
+  margin: 0;
 }
 
 /* Grammar breakdown modal width constraint */

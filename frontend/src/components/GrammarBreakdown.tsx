@@ -427,9 +427,7 @@ export function GrammarBreakdown({ isOpen, onClose, tokens, loading = false }: G
         <Footer className="p-4 border-t border-gray-200 pwa-safe-bottom">
           <Button 
             onClick={handleClose}
-            className="w-full"
-            variant="outline"
-            style={{ backgroundColor: '#A8C686', borderColor: '#A8C686', color: 'white' }}
+            className="w-full bg-accent hover:bg-accent/90 text-accent-foreground border-0"
           >
             Close
           </Button>

@@ -7,7 +7,10 @@ import path from 'path'
 export const mangaRoutes = new Elysia({ prefix: '/api' })
   .get('/manga', async () => {
     const manga = await prisma.manga.findMany({
-      orderBy: { createdAt: 'desc' },
+      orderBy: [
+        { lastReadAt: { sort: 'desc', nulls: 'last' } },
+        { createdAt: 'desc' }
+      ],
       select: {
         id: true,
         title: true,
@@ -16,6 +19,7 @@ export const mangaRoutes = new Elysia({ prefix: '/api' })
         author: true,
         thumbnail: true,
         currentPage: true,
+        lastReadAt: true,
         createdAt: true,
         _count: {
           select: { pages: true }
@@ -136,6 +140,24 @@ export const mangaRoutes = new Elysia({ prefix: '/api' })
     }
   })
 
+  .put('/manga/:id/last-read', async ({ params }) => {
+    // Update last read timestamp when manga is opened
+    const manga = await prisma.manga.findUnique({
+      where: { id: params.id }
+    })
+    
+    if (!manga) {
+      throw new Error('Manga not found')
+    }
+    
+    await prisma.manga.update({
+      where: { id: params.id },
+      data: { lastReadAt: new Date() }
+    })
+    
+    return { success: true }
+  })
+
   .put('/manga/:id/progress', async ({ params, body }) => {
     const { currentPage } = body as { currentPage: number }
     
@@ -161,10 +183,13 @@ export const mangaRoutes = new Elysia({ prefix: '/api' })
       throw new Error('currentPage exceeds total pages')
     }
     
-    // Update reading progress
+    // Update reading progress and last read timestamp
     await prisma.manga.update({
       where: { id: params.id },
-      data: { currentPage }
+      data: { 
+        currentPage,
+        lastReadAt: new Date()
+      }
     })
     
     return { 
