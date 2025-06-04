@@ -35,7 +35,12 @@
       "Bash(sudo systemctl start:*)",
       "WebFetch(domain:jaxs.onl)",
       "Bash(bunx prisma db:*)",
-      "WebFetch(domain:swiperjs.com)"
+      "WebFetch(domain:swiperjs.com)",
+      "WebFetch(domain:www.edrdg.org)",
+      "WebFetch(domain:www.reddit.com)",
+      "WebFetch(domain:blog.alexwendland.com)",
+      "WebFetch(domain:itnext.io)",
+      "WebFetch(domain:raw.githubusercontent.com)"
     ],
     "deny": []
   }

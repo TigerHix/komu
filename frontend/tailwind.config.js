@@ -18,7 +18,7 @@ export default {
     },
     extend: {
       fontFamily: {
-        'apple': ['-apple-system', 'BlinkMacSystemFont', '"SF Pro Display"', '"SF Pro Text"', '"Helvetica Neue"', 'Helvetica', 'Arial', '"Kosugi Maru"', 'sans-serif'],
+        'apple': ['-apple-system', 'BlinkMacSystemFont', '"Inter"', '"SF Pro Display"', '"SF Pro Text"', '"Helvetica Neue"', 'Helvetica', 'Arial', '"Kosugi Maru"', 'sans-serif'],
       },
       colors: {
         border: "hsl(var(--border))",

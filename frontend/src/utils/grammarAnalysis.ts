@@ -7,6 +7,9 @@ export enum PartOfSpeech {
   ADJ_IX = 'adj-ix',        // archaic/literary i-adjectives 
   ADJ_NA = 'adj-na',        // na-adjectives (adjectival nouns)
   ADJ_NO = 'adj-no',        // nouns which may take the genitive case particle の
+  ADJ_PN = 'adj-pn',        // pre-noun adjectival (rentaishi)
+  ADJ_T = 'adj-t',          // 'taru' adjective
+  ADJ_F = 'adj-f',          // noun or verb acting prenominally
 
   // Adverbs
   ADV = 'adv',              // adverb
@@ -78,6 +81,11 @@ export enum PartOfSpeech {
   VS_S = 'vs-s',            // suru verb - special class
   VT = 'vt',                // transitive verb
   VI = 'vi',                // intransitive verb
+  VZ = 'vz',                // Ichidan verb - zuru verb (alternative form of -jiru verbs)
+  V5URU = 'v5uru',          // Godan verb - Uru old class verb (old form of Eru)
+
+  // Onomatopoeia
+  ON_MIM = 'on-mim',        // onomatopoeic or mimetic word
 
   // Other
   UNC = 'unc',              // unclassified
@@ -91,6 +99,9 @@ export const PartOfSpeechLabels: Record<PartOfSpeech, string> = {
   [PartOfSpeech.ADJ_IX]: 'I-Adjective (Archaic)',
   [PartOfSpeech.ADJ_NA]: 'Na-Adjective',
   [PartOfSpeech.ADJ_NO]: 'No-Adjective',
+  [PartOfSpeech.ADJ_PN]: 'Pre-noun Adjective',
+  [PartOfSpeech.ADJ_T]: 'Taru-Adjective',
+  [PartOfSpeech.ADJ_F]: 'Prenominal',
 
   // Adverbs
   [PartOfSpeech.ADV]: 'Adverb',
@@ -162,6 +173,11 @@ export const PartOfSpeechLabels: Record<PartOfSpeech, string> = {
   [PartOfSpeech.VS_S]: 'Suru Verb (Special)',
   [PartOfSpeech.VT]: 'Transitive Verb',
   [PartOfSpeech.VI]: 'Intransitive Verb',
+  [PartOfSpeech.VZ]: 'Zuru Verb',
+  [PartOfSpeech.V5URU]: 'Godan Verb (-uru)',
+
+  // Onomatopoeia
+  [PartOfSpeech.ON_MIM]: 'Onomatopoeia',
 
   // Other
   [PartOfSpeech.UNC]: 'Unclassified',
@@ -195,6 +211,9 @@ export const PartOfSpeechCategoryMap: Record<PartOfSpeech, PartOfSpeechCategory>
   [PartOfSpeech.ADJ_IX]: PartOfSpeechCategory.ADJECTIVE,
   [PartOfSpeech.ADJ_NA]: PartOfSpeechCategory.ADJECTIVE,
   [PartOfSpeech.ADJ_NO]: PartOfSpeechCategory.ADJECTIVE,
+  [PartOfSpeech.ADJ_PN]: PartOfSpeechCategory.ADJECTIVE,
+  [PartOfSpeech.ADJ_T]: PartOfSpeechCategory.ADJECTIVE,
+  [PartOfSpeech.ADJ_F]: PartOfSpeechCategory.ADJECTIVE,
 
   // Adverbs
   [PartOfSpeech.ADV]: PartOfSpeechCategory.ADVERB,
@@ -262,6 +281,11 @@ export const PartOfSpeechCategoryMap: Record<PartOfSpeech, PartOfSpeechCategory>
   [PartOfSpeech.VS_S]: PartOfSpeechCategory.VERB,
   [PartOfSpeech.VT]: PartOfSpeechCategory.VERB,
   [PartOfSpeech.VI]: PartOfSpeechCategory.VERB,
+  [PartOfSpeech.VZ]: PartOfSpeechCategory.VERB,
+  [PartOfSpeech.V5URU]: PartOfSpeechCategory.VERB,
+
+  // Onomatopoeia
+  [PartOfSpeech.ON_MIM]: PartOfSpeechCategory.EXPRESSION,
 
   // Other
   [PartOfSpeech.UNC]: PartOfSpeechCategory.OTHER,
@@ -418,8 +442,8 @@ function convertIchiranToGrammarTokens(ichiranTokens: IchiranToken[], originalTe
       return {
         word: originalChar,
         reading: '',
-        meaning: ['punctuation'],
-        partOfSpeech: [PartOfSpeech.PUNCTUATION],
+        meaning: [],
+        partOfSpeech: [PartOfSpeechLabels[PartOfSpeech.PUNCTUATION]],
         conjugation: [],
         alternatives: [],
       }
@@ -743,7 +767,8 @@ function parsePartOfSpeech(pos: string): string[] {
       const posEnum = tag as PartOfSpeech
       result.push(PartOfSpeechLabels[posEnum])
     } else {
-      // Fallback for unknown tags
+      // Fallback for unknown tags - log for debugging
+      console.warn('Unknown POS tag encountered:', tag)
       result.push(tag)
     }
   }

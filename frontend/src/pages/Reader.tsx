@@ -32,6 +32,7 @@ export default function Reader() {
   })
   const [showSettings, setShowSettings] = useState(false)
   const settingsRef = useRef<HTMLDivElement>(null)
+  const settingsButtonRef = useRef<HTMLButtonElement>(null)
   
   
   // Grammar breakdown states
@@ -167,42 +168,52 @@ export default function Reader() {
     setSelectedBlockIndex(null)
   }, [])
 
-  // Lock body scroll completely when in reader mode
+  // Lock body scroll with iOS fixed positioning for translucent status bar
   useEffect(() => {
-    // Always lock body scroll in reader to prevent library scroll bleed-through
+    // Store original styles
     const originalOverflow = document.body.style.overflow
     const originalPosition = document.body.style.position
-    const originalWidth = document.body.style.width
-    const originalHeight = document.body.style.height
+    const originalTop = document.body.style.top
+    const originalLeft = document.body.style.left
     
+    // Apply iOS-style fixed positioning (like react-sheet-slide does)
+    const { scrollY, scrollX } = window
     document.body.style.overflow = 'hidden'
     document.body.style.position = 'fixed'
-    document.body.style.width = '100%'
-    document.body.style.height = '100%'
+    document.body.style.top = `${-scrollY}px`
+    document.body.style.left = `${-scrollX}px`
     
     return () => {
-      // Restore original styles when leaving reader
+      // Restore all original styles
       document.body.style.overflow = originalOverflow
       document.body.style.position = originalPosition
-      document.body.style.width = originalWidth
-      document.body.style.height = originalHeight
+      document.body.style.top = originalTop
+      document.body.style.left = originalLeft
+      
+      // Restore scroll position
+      window.scrollTo(scrollX, scrollY)
+    }
+  }, [])
+  
+  // Add reader-mode class for black background
+  useEffect(() => {
+    document.documentElement.classList.add('reader-mode')
+    
+    return () => {
+      document.documentElement.classList.remove('reader-mode')
     }
   }, [])
 
-  // Additional body scroll lock when grammar breakdown is open
-  useEffect(() => {
-    if (showGrammarBreakdown) {
-      document.body.style.overflow = 'hidden'
-      document.body.style.position = 'fixed'
-      document.body.style.width = '100%'
-      document.body.style.height = '100%'
-    }
-  }, [showGrammarBreakdown])
+  // Let react-sheet-slide handle its own body scroll lock when open
+  // No additional body manipulation needed
 
   // Handle click outside settings popup
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (settingsRef.current && !settingsRef.current.contains(event.target as Node)) {
+      const target = event.target as Node
+      // Don't close if clicking on settings popup or settings button
+      if (settingsRef.current && !settingsRef.current.contains(target) &&
+          settingsButtonRef.current && !settingsButtonRef.current.contains(target)) {
         setShowSettings(false)
       }
     }
@@ -348,43 +359,6 @@ export default function Reader() {
     }
   }, [showUI, showSettings])
 
-  // Dynamic theme color for PWA status bar
-  useEffect(() => {
-    // Check if we're in a PWA
-    const isPWA = window.matchMedia('(display-mode: standalone)').matches || 
-                  window.navigator.standalone === true
-
-    if (isPWA) {
-      let themeColorMeta = document.querySelector('meta[name="theme-color"]')
-      
-      if (!themeColorMeta) {
-        themeColorMeta = document.createElement('meta')
-        themeColorMeta.setAttribute('name', 'theme-color')
-        document.head.appendChild(themeColorMeta)
-      }
-
-      // Set theme color based on UI visibility in reader
-      if (showUI) {
-        // Dark overlay color when UI is visible
-        themeColorMeta.setAttribute('content', 'rgba(0, 0, 0, 0.8)')
-      } else {
-        // Pure black to match manga background for seamless integration
-        themeColorMeta.setAttribute('content', '#000000')
-      }
-    }
-
-    // Cleanup function to reset on unmount
-    return () => {
-      const isPWA = window.matchMedia('(display-mode: standalone)').matches || 
-                    window.navigator.standalone === true
-      if (isPWA) {
-        const themeColorMeta = document.querySelector('meta[name="theme-color"]')
-        if (themeColorMeta) {
-          themeColorMeta.setAttribute('content', 'hsl(142, 65%, 28%)') // Reset to original accent color
-        }
-      }
-    }
-  }, [showUI])
 
 
   if (loading) {
@@ -455,13 +429,27 @@ export default function Reader() {
       <AnimatePresence>
         {showUI && (
           <motion.div 
-            initial={{ opacity: 0, y: -20 }}
+            initial={{ opacity: 0, y: -30 }}
             animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            transition={{ duration: 0.3, ease: "easeOut" }}
-            className="absolute top-0 left-0 right-0 z-10 bg-overlay backdrop-blur-xl"
+            exit={{ opacity: 0, y: -30 }}
+            transition={{ 
+              type: "spring",
+              stiffness: 400,
+              damping: 25,
+              delay: 0.1
+            }}
+            className="absolute left-0 right-0 z-10 reader-gradient-toolbar"
+            style={{
+              top: '-90px',
+              height: '270px',
+              paddingTop: '90px'
+            }}
           >
-            <div className="px-6 py-4">
+            <div className="py-4" style={{ 
+              paddingLeft: 'max(24px, env(safe-area-inset-left, 24px))', 
+              paddingRight: 'max(24px, env(safe-area-inset-right, 24px))',
+              paddingTop: 'calc(16px + env(safe-area-inset-top, 0px))'
+            }}>
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-4">
                   <motion.div
@@ -487,10 +475,14 @@ export default function Reader() {
                   </motion.div>
                   <div className="min-w-0 flex-1">
                     <h1 className="apple-headline text-white font-semibold truncate">{manga.title}</h1>
-                    <p className="apple-caption-1 text-white/70 mt-0.5">Page {currentPage + 1} of {manga.pages.length}</p>
+                    <p className="apple-caption-1 text-white/70 mt-0.5">
+                      {manga.type && manga.number ? 
+                        `${manga.type} ${manga.number}` : 
+                        `Page ${currentPage + 1} of ${manga.pages.length}`}
+                    </p>
                   </div>
                 </div>
-                <div className="flex items-center space-x-3">
+                <div className="flex items-center">
                   <AnimatePresence>
                     {currentPageData && ocrService.pageOcrStatus[currentPageData.id] === 'PROCESSING' && (
                       <motion.div 
@@ -504,19 +496,6 @@ export default function Reader() {
                       </motion.div>
                     )}
                   </AnimatePresence>
-                  <motion.div
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                  >
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setShowSettings(!showSettings)}
-                      className="text-white/90 hover:text-white hover:bg-white/20 p-2 rounded-xl transition-all duration-200"
-                    >
-                      <Settings className="h-5 w-5" />
-                    </Button>
-                  </motion.div>
                 </div>
               </div>
             </div>
@@ -529,25 +508,30 @@ export default function Reader() {
         {showSettings && (
           <motion.div 
             ref={settingsRef}
-            initial={{ opacity: 0, scale: 0.9, y: -10 }}
+            initial={{ opacity: 0, scale: 0.9, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.9, y: -10 }}
-            transition={{ duration: 0.2, ease: "easeOut" }}
-            className="absolute top-20 right-6 z-20 bg-surface-1/95 backdrop-blur-xl rounded-2xl border border-border/20 shadow-xl overflow-hidden"
+            exit={{ opacity: 0, scale: 0.9, y: 20 }}
+            transition={{ 
+              type: "spring",
+              stiffness: 500,
+              damping: 30
+            }}
+            className="absolute z-20 bg-surface-1/95 backdrop-blur-xl rounded-2xl border border-border/20 shadow-xl overflow-hidden"
+            style={{
+              bottom: 'max(100px, calc(env(safe-area-inset-bottom, 24px) + 76px))',
+              right: '16px',
+              transformOrigin: 'bottom right'
+            }}
           >
             <div className="p-6 min-w-[240px]">
               <h3 className="apple-headline text-text-primary font-semibold mb-4">Reading Mode</h3>
               <div className="space-y-2">
                 <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
                   <Button
-                    variant={readingMode === 'rtl' ? 'default' : 'ghost'}
+                    variant={readingMode === 'rtl' ? 'accent' : 'accent-ghost'}
                     size="sm"
                     onClick={() => setReadingMode('rtl')}
-                    className={`w-full justify-start apple-callout font-medium transition-all duration-200 rounded-xl h-12 ${
-                      readingMode === 'rtl' 
-                        ? 'bg-accent text-accent-foreground shadow-sm' 
-                        : 'text-text-primary hover:bg-surface-2'
-                    }`}
+                    className="w-full justify-start apple-callout font-medium transition-all duration-200 rounded-xl h-12"
                   >
                     <BookOpen className="h-4 w-4 mr-3" />
                     Right to Left (RTL)
@@ -555,14 +539,10 @@ export default function Reader() {
                 </motion.div>
                 <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
                   <Button
-                    variant={readingMode === 'ltr' ? 'default' : 'ghost'}
+                    variant={readingMode === 'ltr' ? 'accent' : 'accent-ghost'}
                     size="sm"
                     onClick={() => setReadingMode('ltr')}
-                    className={`w-full justify-start apple-callout font-medium transition-all duration-200 rounded-xl h-12 ${
-                      readingMode === 'ltr' 
-                        ? 'bg-accent text-accent-foreground shadow-sm' 
-                        : 'text-text-primary hover:bg-surface-2'
-                    }`}
+                    className="w-full justify-start apple-callout font-medium transition-all duration-200 rounded-xl h-12"
                   >
                     <Monitor className="h-4 w-4 mr-3" />
                     Left to Right (LTR)
@@ -570,14 +550,10 @@ export default function Reader() {
                 </motion.div>
                 <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
                   <Button
-                    variant={readingMode === 'scrolling' ? 'default' : 'ghost'}
+                    variant={readingMode === 'scrolling' ? 'accent' : 'accent-ghost'}
                     size="sm"
                     onClick={() => setReadingMode('scrolling')}
-                    className={`w-full justify-start apple-callout font-medium transition-all duration-200 rounded-xl h-12 ${
-                      readingMode === 'scrolling' 
-                        ? 'bg-accent text-accent-foreground shadow-sm' 
-                        : 'text-text-primary hover:bg-surface-2'
-                    }`}
+                    className="w-full justify-start apple-callout font-medium transition-all duration-200 rounded-xl h-12"
                   >
                     <Scroll className="h-4 w-4 mr-3" />
                     Continuous Scrolling
@@ -592,22 +568,45 @@ export default function Reader() {
       {/* Main Content */}
       {renderContent()}
 
-      {/* Refined Navigation Footer */}
+      {/* Floating Bottom Panel */}
       <AnimatePresence>
         {showUI && (
           <motion.div 
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 20 }}
-            transition={{ duration: 0.3, ease: "easeOut" }}
-            className="absolute bottom-0 left-0 right-0 z-10 bg-overlay backdrop-blur-xl pwa-safe-bottom"
+            initial={{ opacity: 0, y: 100, scale: 0.9 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 100, scale: 0.9 }}
+            transition={{ 
+              type: "spring",
+              stiffness: 500,
+              damping: 30
+            }}
+            className="absolute z-10"
+            style={{
+              bottom: 'max(24px, env(safe-area-inset-bottom, 24px))',
+              left: '16px',
+              right: '16px',
+              background: 'rgba(28, 28, 30, 0.95)',
+              backdropFilter: 'blur(40px) saturate(180%)',
+              borderRadius: '20px',
+              border: '0.5px solid rgba(255, 255, 255, 0.1)',
+              boxShadow: `
+                0 8px 32px rgba(0, 0, 0, 0.3),
+                0 2px 8px rgba(0, 0, 0, 0.15),
+                inset 0 1px 0 rgba(255, 255, 255, 0.1)
+              `
+            }}
+            whileHover={{ y: -2 }}
           >
             <div className="px-6 py-4">
               <div className="flex items-center space-x-4">
-                <div className="text-white apple-caption-1 font-medium min-w-fit bg-white/10 px-3 py-1.5 rounded-full">
-                  {progressBarValue + 1} / {manga.pages.length}
+                {/* Page Counter */}
+                <div className="text-white apple-caption-1 font-medium min-w-fit">
+                  <span className="bg-white/10 px-3 py-1.5 rounded-full">
+                    {progressBarValue + 1} / {manga.pages.length}
+                  </span>
                 </div>
                 
+                {/* Enhanced Progress Bar */}
                 <div className="flex flex-1 relative">
                   <input
                     type="range"
@@ -619,13 +618,31 @@ export default function Reader() {
                       const newPage = readingMode === 'rtl' ? manga.pages.length - 1 - sliderValue : sliderValue
                       handleProgressBarChange(newPage)
                     }}
-                    className="w-full h-2 bg-white/20 rounded-full appearance-none cursor-default slider transition-all duration-200 hover:h-3"
+                    className="w-full h-1.5 bg-white/20 rounded-full appearance-none cursor-default slider transition-all duration-300 hover:h-2"
                     style={{
                       background: readingMode === 'rtl' 
                         ? `linear-gradient(to left, hsl(var(--accent)) 0%, hsl(var(--accent)) ${((progressBarValue + 1) / manga.pages.length) * 100}%, rgba(255,255,255,0.2) ${((progressBarValue + 1) / manga.pages.length) * 100}%, rgba(255,255,255,0.2) 100%)`
                         : `linear-gradient(to right, hsl(var(--accent)) 0%, hsl(var(--accent)) ${((progressBarValue + 1) / manga.pages.length) * 100}%, rgba(255,255,255,0.2) ${((progressBarValue + 1) / manga.pages.length) * 100}%, rgba(255,255,255,0.2) 100%)`
                     }}
                   />
+                </div>
+
+                {/* Settings Controls */}
+                <div className="flex items-center">
+                  <motion.div
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                  >
+                    <Button
+                      ref={settingsButtonRef}
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setShowSettings(!showSettings)}
+                      className="text-white/90 hover:text-white hover:bg-white/20 p-2 rounded-xl transition-all duration-200"
+                    >
+                      <Settings className="h-4 w-4" />
+                    </Button>
+                  </motion.div>
                 </div>
               </div>
             </div>

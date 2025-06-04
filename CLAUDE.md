@@ -1,4 +1,4 @@
-# Manga Reader - Claude Code Memory
+# Komu Manga Reader - Claude Code Memory
 
 ## 🎯 Project Overview
 Self-hosted manga reader web application for Japanese language learning. Microservices architecture with TypeScript frontend/backend and Python OCR services. Features Apple-level design polish with full PWA support and advanced touch interactions.
@@ -23,13 +23,13 @@ Self-hosted manga reader web application for Japanese language learning. Microse
 
 ## 📁 Project Structure
 ```
-/home/tiger/komu/
+komu/
 ├── frontend/             # React app (port 5847)
 ├── backend/              # Elysia API (port 3847)  
 ├── inference/            # Python OCR service (port 8847)
 ├── comic_text_detector/  # Git submodule - text detection
 ├── ichiran/              # Git submodule - tokenization
-└── CLAUDE.md            # This file
+└── CLAUDE.md             # This file
 ```
 
 ## 🛠️ Quick Start
