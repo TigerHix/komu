@@ -113,39 +113,23 @@ export function TextPopoutModal({
     }
   }, [])
 
-  if (!isOpen || !selectedBlock || !croppedImageUrl || !croppedDimensions) {
-    return <canvas ref={canvasRef} style={{ display: 'none' }} />
-  }
-
-  // Calculate display dimensions with constraints
-  const maxWidth = Math.min(400, window.innerWidth * 0.8) // Max 400px or 80% of screen width
-  const maxHeight = Math.min(300, window.innerHeight * 0.4) // Max 300px or 40% of screen height
+  // Calculate display dimensions when we have valid data
+  let displayWidth = 0
+  let displayHeight = 0
   
-  const aspectRatio = croppedDimensions.width / croppedDimensions.height
-  
-  let displayWidth = croppedDimensions.width
-  let displayHeight = croppedDimensions.height
-  
-  // Scale down if too large, maintaining aspect ratio
-  if (displayWidth > maxWidth) {
-    displayWidth = maxWidth
-    displayHeight = displayWidth / aspectRatio
-  }
-  
-  if (displayHeight > maxHeight) {
-    displayHeight = maxHeight
+  if (croppedDimensions) {
+    const aspectRatio = croppedDimensions.width / croppedDimensions.height
+    
+    // Height is always 20vh
+    displayHeight = window.innerHeight * 0.2 // 20vh
+    // Width follows aspect ratio
     displayWidth = displayHeight * aspectRatio
-  }
-  
-  // Ensure minimum size for readability
-  const minSize = 60
-  if (displayWidth < minSize || displayHeight < minSize) {
-    if (aspectRatio > 1) {
-      displayWidth = minSize
-      displayHeight = minSize / aspectRatio
-    } else {
-      displayHeight = minSize
-      displayWidth = minSize * aspectRatio
+    
+    // If width exceeds 90vw, constrain by width instead
+    const maxWidth = window.innerWidth * 0.9 // 90vw
+    if (displayWidth > maxWidth) {
+      displayWidth = maxWidth
+      displayHeight = displayWidth / aspectRatio
     }
   }
 
@@ -154,45 +138,47 @@ export function TextPopoutModal({
       <canvas ref={canvasRef} style={{ display: 'none' }} />
       
       <AnimatePresence>
-        <motion.div
-          initial={{ 
-            opacity: 0,
-            scale: 0.1,
-            x: originalPosition ? originalPosition.x - window.innerWidth / 2 : 0,
-            y: originalPosition ? originalPosition.y - (window.innerHeight * 0.2) : 0,
-          }}
-          animate={{ 
-            opacity: Math.max(0, 1 - sheetProgress), // Smooth fade based on progress
-            scale: 1,
-            x: 0,
-            y: 0,
-          }}
-          exit={{ 
-            opacity: 0,
-            scale: 0.1,
-            x: originalPosition ? originalPosition.x - window.innerWidth / 2 : 0,
-            y: originalPosition ? originalPosition.y - (window.innerHeight * 0.2) : 0,
-          }}
-          transition={{
-            type: "spring",
-            stiffness: 500,
-            damping: 30,
-            opacity: { 
-              duration: 0.3,
-              ease: "easeOut"
-            }
-          }}
-          className="fixed pointer-events-none flex items-center justify-center"
-          style={{
-            top: '20%',
-            left: '50%',
-            width: `${displayWidth}px`,
-            height: `${displayHeight}px`,
-            marginLeft: `-${displayWidth / 2}px`, // Half of width for perfect centering
-            marginTop: `-${displayHeight / 2}px`,  // Half of height for perfect centering
-            zIndex: 2 // Above backdrop (z-index: 1)
-          }}
-        >
+        {isOpen && selectedBlock && croppedImageUrl && croppedDimensions && (
+          <motion.div
+            key="textPopout"
+            initial={{ 
+              opacity: 0,
+              scale: 0.1,
+              x: originalPosition ? originalPosition.x - window.innerWidth / 2 : 0,
+              y: originalPosition ? originalPosition.y - (window.innerHeight * 0.25) : 0,
+            }}
+            animate={{ 
+              opacity: Math.max(0, 1 - sheetProgress), // Smooth fade based on progress
+              scale: 1,
+              x: 0,
+              y: 0,
+            }}
+            exit={{ 
+              opacity: 0,
+              scale: 0.1,
+              x: originalPosition ? originalPosition.x - window.innerWidth / 2 : 0,
+              y: originalPosition ? originalPosition.y - (window.innerHeight * 0.25) : 0,
+            }}
+            transition={{
+              type: "spring",
+              stiffness: 500,
+              damping: 30,
+              opacity: { 
+                duration: 0.3,
+                ease: "easeOut"
+              }
+            }}
+            className="fixed pointer-events-none flex items-center justify-center"
+            style={{
+              top: '25vh',
+              left: '50vw',
+              width: `${displayWidth}px`,
+              height: `${displayHeight}px`,
+              marginLeft: `-${displayWidth / 2}px`, // Half of width for perfect centering
+              marginTop: `-${displayHeight / 2}px`,  // Half of height for perfect centering
+              zIndex: 2 // Above backdrop (z-index: 1)
+            }}
+          >
           <motion.div
             initial={{ rotateY: 0, scale: 1.2 }}
             animate={{ 
@@ -249,7 +235,8 @@ export function TextPopoutModal({
               }}
             />
           </motion.div>
-        </motion.div>
+          </motion.div>
+        )}
       </AnimatePresence>
     </>
   )
