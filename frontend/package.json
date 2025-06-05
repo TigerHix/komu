@@ -7,7 +7,8 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "clear-cache": "rm -rf node_modules/.vite"
   },
   "dependencies": {
     "@radix-ui/react-dialog": "^1.0.5",
@@ -25,7 +26,7 @@
     "react-dom": "^18.2.0",
     "react-image-crop": "^11.0.10",
     "react-router-dom": "^6.8.1",
-    "react-sheet-slide": "^1.5.0",
+    "react-sheet-slide": "file:../packages/react-sheet-slide/packages/react-sheet-slide",
     "react-window": "^1.8.11",
     "react-window-infinite-loader": "^1.0.10",
     "react-zoom-pan-pinch": "^3.7.0",

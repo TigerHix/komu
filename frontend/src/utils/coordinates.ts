@@ -134,3 +134,97 @@ export function calculateZoomCenter(
     y: (clickY - imgCenterY) * -1
   }
 }
+
+/**
+ * Calculate the screen coordinates of a text block for animation purposes
+ * This accounts for different reading modes and coordinate transformations
+ */
+export function calculateTextBlockScreenPosition(
+  textBlock: TextBlock,
+  imageSize: Dimensions,
+  readingMode: 'rtl' | 'ltr' | 'scrolling',
+  pageIndex: number,
+  currentPageIndex: number
+): Coordinates | null {
+  try {
+    // Get the text block center coordinates in SVG space
+    const [x1, y1, x2, y2] = textBlock.bbox
+    const centerX = (x1 + x2) / 2
+    const centerY = (y1 + y2) / 2
+
+    if (readingMode === 'scrolling') {
+      // In scrolling mode, find the page element by looking at react-window structure
+      const listContainer = document.querySelector('[style*="transform"]')
+      if (!listContainer) {
+        console.warn('Could not find react-window list container')
+        return null
+      }
+
+      // Find all page slides within the virtualized list
+      const pageSlides = listContainer.querySelectorAll('div[style*="height"]')
+      const targetPageSlide = Array.from(pageSlides)[pageIndex] as HTMLElement
+
+      if (!targetPageSlide) {
+        console.warn('Could not find page slide for index:', pageIndex)
+        return null
+      }
+
+      // Get the image element within this page slide
+      const imgElement = targetPageSlide.querySelector('img') as HTMLImageElement
+      if (!imgElement) {
+        console.warn('Could not find image element in page slide:', pageIndex)
+        return null
+      }
+
+      // Get the image's bounding rect
+      const imgRect = imgElement.getBoundingClientRect()
+      
+      // Calculate the scale factor between SVG coordinates and displayed image
+      const scaleX = imgRect.width / imageSize.width
+      const scaleY = imgRect.height / imageSize.height
+
+      // Convert SVG coordinates to screen coordinates
+      const screenX = imgRect.left + (centerX * scaleX)
+      const screenY = imgRect.top + (centerY * scaleY)
+
+      return { x: screenX, y: screenY }
+
+    } else {
+      // For swiper modes (RTL/LTR), only consider the current active page
+      if (pageIndex !== currentPageIndex) {
+        // Text block is not on the current page, can't calculate position
+        return null
+      }
+
+      // Find the active swiper slide
+      const activeSlide = document.querySelector('.swiper-slide-active')
+      if (!activeSlide) {
+        console.warn('Could not find active swiper slide')
+        return null
+      }
+
+      // Get the image element in the active slide
+      const imgElement = activeSlide.querySelector('img') as HTMLImageElement
+      if (!imgElement) {
+        console.warn('Could not find image element in active slide')
+        return null
+      }
+
+      // Get the image's bounding rect
+      const imgRect = imgElement.getBoundingClientRect()
+      
+      // Calculate the scale factor between SVG coordinates and displayed image
+      const scaleX = imgRect.width / imageSize.width
+      const scaleY = imgRect.height / imageSize.height
+
+      // Convert SVG coordinates to screen coordinates
+      const screenX = imgRect.left + (centerX * scaleX)
+      const screenY = imgRect.top + (centerY * scaleY)
+
+      return { x: screenX, y: screenY }
+    }
+  } catch (error) {
+    console.error('Error calculating text block screen position:', error)
+    return null
+  }
+}

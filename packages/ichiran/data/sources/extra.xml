@@ -1,0 +1,88 @@
+<outer>
+  <entry>
+    <ent_seq>お掛け</ent_seq>
+    <k_ele><keb>お掛け</keb><ke_pri>spec1</ke_pri></k_ele>
+    <r_ele><reb>おかけ</reb><re_pri>spec1</re_pri></r_ele>
+    <sense>
+      <pos>vs</pos><misc>uk</misc><misc>hum</misc>
+      <gloss xml:lang="eng">to cause</gloss>
+    </sense>
+    <sense>
+      <pos>vs</pos><misc>uk</misc><misc>hum</misc>
+      <gloss xml:lang="eng">to sit</gloss>
+    </sense>
+    <sense>
+      <pos>vs</pos><misc>uk</misc><misc>hum</misc>
+      <gloss xml:lang="eng">to spend (time)</gloss>
+    </sense>
+  </entry>
+  <entry>
+    <ent_seq>せず</ent_seq>
+    <r_ele>
+      <reb>せず</reb>
+    </r_ele>
+    <sense>
+      <pos>prt</pos>
+      <pos>suf</pos>
+      <gloss xml:lang="eng">without</gloss>
+    </sense>
+  </entry>
+  <entry>
+    <ent_seq>甲斐もない</ent_seq>
+    <k_ele>
+      <keb>甲斐もない</keb>
+    </k_ele>
+    <k_ele>
+      <keb>甲斐も無い</keb>
+    </k_ele>
+    <r_ele>
+      <reb>かいもない</reb>
+    </r_ele>
+    <sense>
+      <pos>exp</pos>
+      <pos>adj-i</pos>
+      <gloss xml:lang="eng">pointless</gloss>
+      <gloss xml:lang="eng">in vain</gloss>
+    </sense>
+  </entry>
+  <entry>
+    <ent_seq>観了</ent_seq>
+    <k_ele>
+      <keb>観了</keb>
+    </k_ele>
+    <r_ele>
+      <reb>かんりょう</reb>
+    </r_ele>
+    <sense>
+      <pos>n</pos>
+      <pos>vs</pos>
+      <pos>vt</pos>
+      <gloss xml:lang="eng">finishing watching</gloss>
+    </sense>
+  </entry>
+  <entry>
+    <ent_seq>900000</ent_seq>
+    <r_ele>
+      <reb>たそう</reb>
+    </r_ele>
+    <sense>
+      <pos>suf</pos>
+      <s_inf>after the -masu stem of a verb</s_inf>
+      <gloss xml:lang="eng">to seem to want to (do something)</gloss>
+    </sense>
+  </entry>
+  <entry>
+    <ent_seq>900001</ent_seq>
+    <r_ele>
+      <reb>もいい</reb>
+    </r_ele>
+    <sense>
+      <pos>suf</pos>
+      <s_inf>after the -て form; indicates permission or compromise</s_inf>
+      <gloss xml:lang="eng">OK</gloss>
+      <gloss xml:lang="eng">all right</gloss>
+      <gloss xml:lang="eng">fine</gloss>
+      <gloss xml:lang="eng">no problem</gloss>
+    </sense>
+  </entry>
+</outer>

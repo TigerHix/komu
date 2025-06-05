@@ -17,7 +17,7 @@ interface SwiperGalleryProps {
   onPageChange: (newPageIndex: number) => void
   textBlocks: TextBlock[]
   imageSize: Dimensions | null
-  onBlockClick: (block: TextBlock, index: number) => void
+  onBlockClick: (block: TextBlock, index: number, pageIndex?: number) => void
   onBackgroundClick?: () => void
   readingMode?: 'rtl' | 'ltr' | 'scrolling'
   isGrammarOpen?: boolean
@@ -132,6 +132,7 @@ export function SwiperGallery({
                     onBlockClick={onBlockClick}
                     isGrammarOpen={isGrammarOpen}
                     selectedBlockIndex={selectedBlockIndex}
+                    pageIndex={currentPageIndex}
                   />
                 )}
               </div>

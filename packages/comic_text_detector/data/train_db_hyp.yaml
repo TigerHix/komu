@@ -1,0 +1,51 @@
+data:
+  train_img_dir: 'dataset/train'
+  train_mask_dir: ''
+  val_img_dir: 'dataset/val'
+  val_mask_dir: ''
+  imgsz: 1024
+  augment: True
+  num_workers: 8
+  cache: True
+  aug_param:
+    hsv: 0.3
+    mini_mosaic: 0.7
+    flip_lr: 0.5
+    neg: 0.3
+    size_range: [0.85, 1.1]
+    rotate: 0.33
+    rotate_range: [-70, 70]
+  save_dir: 'results'
+
+train:
+  epochs: 160
+  linear_lr: False
+  optimizer: 'adam'
+  batch_size: 4
+  lr0: 0.01
+  lrf: 0.002
+  warm_up: True
+  momentum: 0.937
+  weight_decay: 0.00002
+  warmup_epochs: 3.0  # warmup epochs (fractions ok)
+  warmup_momentum: 0.8  # warmup initial momentum
+  warmup_bias_lr: 0.1  # warmup initial bias lr
+  eval_interval: 1
+  loss: 'bce'
+  accumulation_steps: 4
+
+model:
+  weights: 'data/yolov5sblk.ckpt'
+  unet_weights: 'data/unet_best.ckpt'
+  db_weights: ''
+  act: 'leaky'
+
+logger:
+  type: 'wandb'
+  run_id: ''
+  project: 'TextDetectDB'
+
+resume:
+  resume_training: False
+  ckpt: ''
+  

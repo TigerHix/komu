@@ -20,7 +20,7 @@ project_root = current_dir.parent.parent
 sys.path.insert(0, str(project_root))
 
 # Set the comic_text_detector path for model files
-comic_detector_path = project_root / "comic_text_detector"
+comic_detector_path = project_root / "packages" / "comic_text_detector"
 
 # Environment configuration
 GENERATE_DEBUG_IMAGES = os.getenv('GENERATE_DEBUG_IMAGES', 'true').lower() == 'true'

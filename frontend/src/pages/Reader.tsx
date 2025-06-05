@@ -7,7 +7,9 @@ import { ArrowLeft, Settings, Loader2, Monitor, BookOpen, Scroll, Bug } from 'lu
 import { GrammarBreakdown } from '@/components/GrammarBreakdown'
 import { SwiperGallery } from '@/components/SwiperGallery'
 import { ScrollingGallery } from '@/components/ScrollingGallery'
+import { TextPopoutModal } from '@/components/TextPopoutModal'
 import { analyzeGrammar, containsJapanese, cleanTextForAnalysis, type GrammarToken } from '@/utils/grammarAnalysis'
+import { calculateTextBlockScreenPosition } from '@/utils/coordinates'
 import { useOcrService } from '@/hooks/useOcrService'
 import { useReaderNavigation } from '@/hooks/useReaderNavigation'
 import { useReaderDebug } from '@/hooks/useReaderDebug'
@@ -41,7 +43,11 @@ export default function Reader() {
   const [grammarAnalysisLoading, setGrammarAnalysisLoading] = useState(false)
   const [selectedSentence, setSelectedSentence] = useState('')
   const [selectedBlockIndex, setSelectedBlockIndex] = useState<number | null>(null)
+  const [selectedBlock, setSelectedBlock] = useState<TextBlock | null>(null)
+  const [selectedPageIndex, setSelectedPageIndex] = useState<number | null>(null)
+  const [originalPosition, setOriginalPosition] = useState<{ x: number; y: number } | null>(null)
   const [showExitTransition, setShowExitTransition] = useState(false)
+  const [sheetProgress, setSheetProgress] = useState(0)
   const [progressBarValue, setProgressBarValue] = useState(() => {
     if (urlPage) {
       const pageNum = parseInt(urlPage, 10) - 1 // Convert to 0-based index
@@ -106,6 +112,7 @@ export default function Reader() {
     onPageChange: handlePageChange
   })
 
+
   // Debounced page change function - this handles ALL side effects
   const debouncedPageChange = useCallback((pageNum: number) => {
     isProgressBarDragging.current = true
@@ -133,7 +140,7 @@ export default function Reader() {
   }, [debouncedPageChange])
 
   // Handle text block clicks for grammar analysis
-  const handleBlockClick = useCallback(async (block: TextBlock, index: number) => {
+  const handleBlockClick = useCallback(async (block: TextBlock, index: number, pageIndex?: number) => {
     const text = block.text?.trim()
     if (!text || !containsJapanese(text)) return
 
@@ -143,8 +150,30 @@ export default function Reader() {
     // Hide UI when clicking on text blocks
     setShowUI(false)
 
+    const actualPageIndex = pageIndex ?? currentPage
+
+    // Calculate original screen position of the text block for animation
+    const blockImageSize = readingMode === 'scrolling' 
+      ? ocrService.scrollImageSizes[actualPageIndex] 
+      : ocrService.singlePageImageSize
+
+    if (blockImageSize) {
+      const screenPos = calculateTextBlockScreenPosition(
+        block,
+        blockImageSize,
+        readingMode,
+        actualPageIndex,
+        currentPage
+      )
+      setOriginalPosition(screenPos)
+    } else {
+      setOriginalPosition(null)
+    }
+
     // Track which block was selected
     setSelectedBlockIndex(index)
+    setSelectedBlock(block)
+    setSelectedPageIndex(actualPageIndex)
     setSelectedSentence(text)
     setShowGrammarBreakdown(true)
     setGrammarAnalysisLoading(true)
@@ -158,7 +187,7 @@ export default function Reader() {
     } finally {
       setGrammarAnalysisLoading(false)
     }
-  }, [])
+  }, [currentPage, readingMode, ocrService.scrollImageSizes, ocrService.singlePageImageSize])
 
   const closeGrammarBreakdown = useCallback(() => {
     setShowGrammarBreakdown(false)
@@ -166,10 +195,17 @@ export default function Reader() {
     setSelectedSentence('')
     setGrammarAnalysisLoading(false)
     setSelectedBlockIndex(null)
+    setSelectedBlock(null)
+    setSelectedPageIndex(null)
+    setOriginalPosition(null)
+    setSheetProgress(0)
   }, [])
 
   // Lock body scroll with iOS fixed positioning for translucent status bar
   useEffect(() => {
+    // Reset scroll position immediately when entering reader
+    window.scrollTo(0, 0)
+    
     // Store original styles
     const originalOverflow = document.body.style.overflow
     const originalPosition = document.body.style.position
@@ -177,11 +213,12 @@ export default function Reader() {
     const originalLeft = document.body.style.left
     
     // Apply iOS-style fixed positioning (like react-sheet-slide does)
-    const { scrollY, scrollX } = window
+    // Use 0 for scroll position since we just reset it
     document.body.style.overflow = 'hidden'
     document.body.style.position = 'fixed'
-    document.body.style.top = `${-scrollY}px`
-    document.body.style.left = `${-scrollX}px`
+    document.body.style.top = '0px'
+    document.body.style.left = '0px'
+    
     
     return () => {
       // Restore all original styles
@@ -190,8 +227,8 @@ export default function Reader() {
       document.body.style.top = originalTop
       document.body.style.left = originalLeft
       
-      // Restore scroll position
-      window.scrollTo(scrollX, scrollY)
+      // Keep scroll at 0 when leaving reader
+      window.scrollTo(0, 0)
     }
   }, [])
   
@@ -363,7 +400,7 @@ export default function Reader() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-black flex items-center justify-center">
+      <div className="fixed inset-0 bg-black flex items-center justify-center">
         <div className="animate-spin h-8 w-8 border-4 border-white border-t-transparent rounded-full" />
       </div>
     )
@@ -438,12 +475,7 @@ export default function Reader() {
               damping: 25,
               delay: 0.1
             }}
-            className="absolute left-0 right-0 z-10 reader-gradient-toolbar"
-            style={{
-              top: '-90px',
-              height: '270px',
-              paddingTop: '90px'
-            }}
+            className="absolute left-0 right-0 z-10 reader-gradient-toolbar reader-toolbar-height"
           >
             <div className="py-4" style={{ 
               paddingLeft: 'max(24px, env(safe-area-inset-left, 24px))', 
@@ -482,7 +514,7 @@ export default function Reader() {
                     </p>
                   </div>
                 </div>
-                <div className="flex items-center">
+                <div className="flex items-center justify-end">
                   <AnimatePresence>
                     {currentPageData && ocrService.pageOcrStatus[currentPageData.id] === 'PROCESSING' && (
                       <motion.div 
@@ -650,12 +682,38 @@ export default function Reader() {
         )}
       </AnimatePresence>
 
+      {/* Text Popout Modal */}
+      <TextPopoutModal
+        isOpen={showGrammarBreakdown && selectedBlock !== null}
+        selectedBlock={selectedBlock}
+        selectedBlockIndex={selectedBlockIndex}
+        imagePath={selectedPageIndex !== null && manga?.pages[selectedPageIndex] 
+          ? manga.pages[selectedPageIndex].imagePath 
+          : (currentPageData?.imagePath || '')
+        }
+        imageSize={selectedPageIndex !== null && readingMode === 'scrolling' 
+          ? ocrService.scrollImageSizes[selectedPageIndex] || { width: 800, height: 1200 }
+          : readingMode === 'scrolling' 
+            ? ocrService.scrollImageSizes[currentPage] || { width: 800, height: 1200 }
+            : ocrService.singlePageImageSize
+        }
+        onClose={() => {}}
+        isBottomSheetExpanded={sheetProgress > 0.3}
+        originalPosition={originalPosition}
+        sheetProgress={sheetProgress}
+        pageIndex={selectedPageIndex ?? currentPage}
+      />
+
       {/* Grammar Breakdown Modal */}
       <GrammarBreakdown
         isOpen={showGrammarBreakdown}
         onClose={closeGrammarBreakdown}
         tokens={grammarTokens}
         loading={grammarAnalysisLoading}
+        onSheetExpansionChange={(progress) => {
+          console.log('Reader received sheet progress:', progress)
+          setSheetProgress(progress)
+        }}
       />
 
       <div id="grammar-breakdown-portal"></div>

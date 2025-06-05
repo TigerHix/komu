@@ -1,6 +1,7 @@
 import React, { useState, useRef } from 'react'
 import { X, ChevronDown } from 'lucide-react'
 import { Sheet, Header, Content, Footer, Portal, detents } from 'react-sheet-slide'
+import type { SheetPositionData } from 'react-sheet-slide'
 import { Button } from '@/components/ui/button'
 import { PartOfSpeechCategory, PartOfSpeechCategoryMap, PartOfSpeech, PartOfSpeechLabels } from '@/utils/grammarAnalysis'
 import { useDarkMode } from '@/hooks/useDarkMode'
@@ -34,6 +35,7 @@ interface GrammarBreakdownProps {
   onClose: () => void
   tokens: GrammarToken[]
   loading?: boolean
+  onSheetExpansionChange?: (progress: number) => void
 }
 
 // Clean POS styling system with dark mode support
@@ -211,7 +213,7 @@ const handleWordClick = (e: React.MouseEvent, index: number, selectedIndex: numb
   }
 }
 
-export function GrammarBreakdown({ isOpen, onClose, tokens, loading = false }: GrammarBreakdownProps) {
+export function GrammarBreakdown({ isOpen, onClose, tokens, loading = false, onSheetExpansionChange }: GrammarBreakdownProps) {
   const [selectedTokenIndex, setSelectedTokenIndex] = useState<number | null>(null)
   const { isDarkMode } = useDarkMode()
   const ref = useRef()
@@ -227,6 +229,19 @@ export function GrammarBreakdown({ isOpen, onClose, tokens, loading = false }: G
     setSelectedTokenIndex(null)
   }, [tokens])
 
+  // Handle real-time sheet position changes
+  const handlePositionChange = React.useCallback((data: SheetPositionData) => {
+    // Call expansion change callback with progress value for smooth fading
+    // Pass the actual progress (0-1) instead of just boolean
+    console.log('Sheet position changed:', data)
+    onSheetExpansionChange?.(data.progress)
+  }, [onSheetExpansionChange])
+
+  // Handle detent changes (for debugging if needed)
+  const handleDetentChange = React.useCallback((detent: string) => {
+    console.log('Detent changed to:', detent)
+  }, [])
+
   return (
     <Portal containerRef="#grammar-breakdown-portal">
       <Sheet
@@ -238,6 +253,9 @@ export function GrammarBreakdown({ isOpen, onClose, tokens, loading = false }: G
         useModal={false}
         useDarkMode={isDarkMode}
         backdropClassName='grammar-breakdown-backdrop'
+        scrollingExpands={true}
+        onPositionChange={handlePositionChange}
+        onDetentChange={handleDetentChange}
       >
         <Header>
           <p className="text-text-primary text-md font-medium" style={{ lineHeight: '2rem' }}>Sentence Breakdown</p>

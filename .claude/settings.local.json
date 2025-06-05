@@ -40,7 +40,12 @@
       "WebFetch(domain:www.reddit.com)",
       "WebFetch(domain:blog.alexwendland.com)",
       "WebFetch(domain:itnext.io)",
-      "WebFetch(domain:raw.githubusercontent.com)"
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "Bash(mv:*)",
+      "Bash(npm run build:*)",
+      "Bash(cat:*)",
+      "Bash(convert:*)",
+      "Bash(pnpm build:*)"
     ],
     "deny": []
   }

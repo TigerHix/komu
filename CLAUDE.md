@@ -27,8 +27,10 @@ komu/
 ├── frontend/             # React app (port 5847)
 ├── backend/              # Elysia API (port 3847)  
 ├── inference/            # Python OCR service (port 8847)
-├── comic_text_detector/  # Git submodule - text detection
-├── ichiran/              # Git submodule - tokenization
+├── packages/             # External dependencies & forks
+│   ├── comic_text_detector/  # Text detection models & scripts
+│   ├── ichiran/              # Japanese tokenization service
+│   └── react-sheet-slide/    # Forked PWA-optimized sheet component
 └── CLAUDE.md             # This file
 ```
 
@@ -74,7 +76,7 @@ BACKEND_PORT=3847
 FRONTEND_PORT=5847
 INFERENCE_PORT=8847
 OPENROUTER_API_KEY=your_key_here
-ICHIRAN_PATH=../ichiran
+ICHIRAN_PATH=../packages/ichiran
 ```
 
 **Frontend (.env)**
@@ -219,11 +221,35 @@ onTouchEnd: Navigate if no long press active and no scroll detected
 - **Selective Highlighting**: Only clicked block remains visible during analysis
 - **State Management**: `selectedBlockIndex` tracks active text block across all components
 
+### Text Popout Animation (NEW)
+- **Component**: `TextPopoutModal.tsx` - Apple-style popout animation for selected text blocks
+- **Features**: Canvas-based image cropping, spring physics animations, automatic sizing
+- **Animation Flow**:
+  1. **Initial**: Scales from original text position (0.1 scale)
+  2. **Spring Physics**: 500 stiffness, 30 damping for natural movement
+  3. **Dynamic Sizing**: Respects aspect ratio with min/max constraints
+  4. **Sheet Integration**: Fades out smoothly as bottom sheet expands using `sheetProgress`
+- **Technical Details**:
+  - Canvas cropping with 10px padding around text bounding box
+  - Automatic cleanup of blob URLs to prevent memory leaks
+  - Green border glow effect with radial gradient overlay
+  - Responsive sizing (max 400px width, 40% screen height)
+  - Z-index coordination with other modal elements
+- **Sheet Integration**: Uses react-sheet-slide fork's `onPositionChange` callback:
+  ```typescript
+  // In parent component
+  const [sheetProgress, setSheetProgress] = useState(0)
+  
+  <Sheet onPositionChange={(data) => setSheetProgress(data.progress)}>
+  <TextPopoutModal sheetProgress={sheetProgress} /> // Fades with sheet expansion
+  ```
+
 ### Component Chain
 ```
 Reader.tsx (selectedBlockIndex state)
 ├── SwiperGallery/ScrollingGallery (pass props)
-└── SvgTextOverlay (render based on selection)
+├── SvgTextOverlay (render based on selection)
+└── TextPopoutModal (cropped text animation)
 ```
 
 ## 🔄 Scrolling Mode Technical Details
@@ -266,6 +292,51 @@ Reader.tsx (selectedBlockIndex state)
 - [ ] File backups (database + uploads)
 - [ ] Disk space monitoring
 - [ ] Environment variables configured
+
+## 📦 Package Management
+
+### External Dependencies in `/packages/`
+- **ichiran**: Moved from git submodule to `/packages/` for better dependency management
+- **comic_text_detector**: Moved from git submodule to `/packages/` for better dependency management  
+- **react-sheet-slide**: Forked PWA-optimized sheet component (removed safe-area conflicts)
+
+### Repository Structure Migration (RECENT CHANGE)
+The project recently migrated from git submodules to a `/packages/` directory structure:
+- **Before**: `comic_text_detector/` and `ichiran/` as git submodules in project root
+- **After**: `/packages/comic_text_detector/` and `/packages/ichiran/` as regular directories
+- **Benefit**: Eliminates submodule complexity while maintaining dependency isolation
+
+### react-sheet-slide Fork Details
+**Fork Purpose**: PWA-safe area compatibility + TextPopoutModal integration
+- **Original Issue**: Hardcoded `env(safe-area-inset-*)` calculations conflicted with PWA layout
+- **Solution**: Removed conflicting safe-area CSS, delegated to global App.css strategy
+- **Installation**: `"react-sheet-slide": "file:../packages/react-sheet-slide/packages/react-sheet-slide"`
+- **Key Changes**:
+  - **CSS**: Modified `sheet.module.css:155` to remove hardcoded safe-area padding conflicts
+  - **Types**: Added `SheetPositionData` type for real-time position tracking
+  - **Event Handlers**: Added `onPositionChange` and `onDetentChange` props for TextPopoutModal integration
+  - **Position Logic**: Real-time calculation of sheet progress (0-1) and active detent detection
+  - **Integration**: Enables TextPopoutModal to fade smoothly as bottom sheet expands
+
+**New Props Added**:
+```typescript
+onPositionChange?: (data: SheetPositionData) => void
+onDetentChange?: (detent: string) => void
+
+type SheetPositionData = {
+  y: number          // Sheet Y position
+  height: number     // Visible sheet height  
+  activeDetent: string // 'medium' | 'large'
+  progress: number   // 0-1 expansion progress
+}
+```
+
+### Package Updates
+```bash
+# No longer using git submodules - packages are regular directories
+# Update react-sheet-slide fork by pulling from upstream and applying PWA fixes
+cd packages/react-sheet-slide && git pull upstream main
+```
 
 ## 🔧 Common Issues
 

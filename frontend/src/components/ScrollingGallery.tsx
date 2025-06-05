@@ -10,7 +10,7 @@ interface ScrollingGalleryProps {
   onPageChange: (newPageIndex: number) => void
   scrollTextBlocks: Record<number, TextBlock[]>
   scrollImageSizes: Record<number, Dimensions>
-  onBlockClick: (block: TextBlock, index: number) => void
+  onBlockClick: (block: TextBlock, index: number, pageIndex?: number) => void
   onBackgroundClick?: () => void
   readingMode?: 'rtl' | 'ltr' | 'scrolling'
   isGrammarOpen?: boolean
@@ -24,7 +24,7 @@ interface ScrollingSlideProps {
     pages: Page[]
     scrollTextBlocks: Record<number, TextBlock[]>
     scrollImageSizes: Record<number, Dimensions>
-    onBlockClick: (block: TextBlock, index: number) => void
+    onBlockClick: (block: TextBlock, index: number, pageIndex?: number) => void
     onBackgroundClick?: () => void
     isGrammarOpen?: boolean
     selectedBlockIndex?: number | null
@@ -62,6 +62,8 @@ function ScrollingSlide({ index, style, data }: ScrollingSlideProps) {
           alt={`Page ${index + 1}`}
           className="max-w-full max-h-full object-contain"
           draggable={false}
+          loading="lazy"
+          decoding="async"
           style={{
             userSelect: 'none',
             pointerEvents: 'none',
@@ -77,6 +79,7 @@ function ScrollingSlide({ index, style, data }: ScrollingSlideProps) {
             onBlockClick={onBlockClick}
             isGrammarOpen={isGrammarOpen}
             selectedBlockIndex={selectedBlockIndex}
+            pageIndex={index}
           />
         )}
       </div>
@@ -136,6 +139,7 @@ export function ScrollingGallery({
   /**
    * Track scroll position and update current page
    * Prevents infinite loops with external navigation
+   * Throttled for Safari performance
    */
   const handleScroll = useCallback(({ scrollOffset }: { scrollOffset: number }) => {
     if (!listRef.current) return
@@ -148,7 +152,10 @@ export function ScrollingGallery({
       const itemHeight = getItemHeight(i)
       if (scrollOffset < accumulated + itemHeight * 0.5) {
         if (i !== currentPageIndex) {
-          onPageChange(i)
+          // Use requestAnimationFrame to prevent Safari crashes from rapid updates
+          requestAnimationFrame(() => {
+            onPageChange(i)
+          })
         }
         break
       }
@@ -158,7 +165,7 @@ export function ScrollingGallery({
     // Reset flag to allow external navigation
     setTimeout(() => {
       isScrollingInternally.current = false
-    }, 100)
+    }, 150) // Slightly longer timeout for Safari
   }, [pages.length, currentPageIndex, onPageChange, getItemHeight])
 
   /**
@@ -231,10 +238,14 @@ export function ScrollingGallery({
             itemSize={getItemHeight}
             itemData={itemData}
             onScroll={handleScroll}
-            overscanCount={2}
+            overscanCount={1} // Reduce overscan for Safari memory management
+            useIsScrolling={true} // Enable scroll state tracking
             style={{
-              scrollbarWidth: 'none', // Hide scrollbars (inaccurate due to virtualization)
+              scrollbarWidth: 'none',
               msOverflowStyle: 'none',
+              // Safari-specific optimizations
+              willChange: 'scroll-position',
+              transform: 'translateZ(0)', // Force hardware acceleration
             }}
             className="[&::-webkit-scrollbar]:hidden"
           >

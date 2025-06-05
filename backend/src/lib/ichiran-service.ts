@@ -19,8 +19,8 @@ export class IchiranService {
   private ichiranPath: string
 
   constructor() {
-    // Get ichiran directory path - configurable via environment or default to ../ichiran
-    const ichiranDir = process.env.ICHIRAN_PATH || '../../../ichiran'
+    // Get ichiran directory path - configurable via environment or default to ../packages/ichiran
+    const ichiranDir = process.env.ICHIRAN_PATH || '../../../packages/ichiran'
     this.ichiranPath = path.resolve(__dirname, ichiranDir)
     
     // Container naming can also be configured

@@ -3,9 +3,10 @@ import { TextBlock } from '@/constants/reader'
 interface SvgTextOverlayProps {
   textBlocks: TextBlock[]
   imageSize: { width: number; height: number }
-  onBlockClick: (block: TextBlock, index: number) => void
+  onBlockClick: (block: TextBlock, index: number, pageIndex?: number) => void
   isGrammarOpen?: boolean
   selectedBlockIndex?: number | null
+  pageIndex?: number
 }
 
 export function SvgTextOverlay({
@@ -13,7 +14,8 @@ export function SvgTextOverlay({
   imageSize,
   onBlockClick,
   isGrammarOpen = false,
-  selectedBlockIndex = null
+  selectedBlockIndex = null,
+  pageIndex
 }: SvgTextOverlayProps) {
   if (!textBlocks.length) return null
 
@@ -48,7 +50,7 @@ export function SvgTextOverlay({
               e.preventDefault()
               e.stopPropagation()
               if (block.text?.trim()) {
-                onBlockClick(block, index)
+                onBlockClick(block, index, pageIndex)
               }
             }}
           >

@@ -1,0 +1,12 @@
+onnx>=1.9.0
+onnx-simplifier>=0.3.6
+opencv-python>=4.1.2
+Pillow>=7.1.2
+torch>=1.7.0
+torchvision>=0.8.1
+tqdm>=4.41.0
+torchsummary
+
+numpy
+wandb
+trdg

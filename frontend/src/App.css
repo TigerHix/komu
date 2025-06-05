@@ -388,7 +388,7 @@
   }
 }
 
-/* Reader gradient fade toolbar with masked backdrop-filter */
+/* Reader gradient fade toolbar with masked backdrop-filter - optimized mask for text visibility */
 .reader-gradient-toolbar {
   background: linear-gradient(
     to bottom,
@@ -405,31 +405,70 @@
   mask-image: linear-gradient(
     to bottom,
     black 0%,
-    black 30%,
-    rgba(0, 0, 0, 0.9) 45%,
-    rgba(0, 0, 0, 0.7) 60%,
-    rgba(0, 0, 0, 0.4) 75%,
-    rgba(0, 0, 0, 0.2) 85%,
+    black 50%,
+    rgba(0, 0, 0, 0.95) 65%,
+    rgba(0, 0, 0, 0.8) 75%,
+    rgba(0, 0, 0, 0.5) 85%,
+    rgba(0, 0, 0, 0.2) 92%,
     transparent 100%
   );
   -webkit-mask-image: linear-gradient(
     to bottom,
     black 0%,
-    black 30%,
-    rgba(0, 0, 0, 0.9) 45%,
-    rgba(0, 0, 0, 0.7) 60%,
-    rgba(0, 0, 0, 0.4) 75%,
-    rgba(0, 0, 0, 0.2) 85%,
+    black 50%,
+    rgba(0, 0, 0, 0.95) 65%,
+    rgba(0, 0, 0, 0.8) 75%,
+    rgba(0, 0, 0, 0.5) 85%,
+    rgba(0, 0, 0, 0.2) 92%,
     transparent 100%
   );
+}
+
+/* Toolbar height - different for PWA vs non-PWA */
+.reader-toolbar-height {
+  /* Non-PWA: shorter height since no notch */
+  top: -60px;
+  height: 180px;
+  padding-top: 60px;
+}
+
+/* PWA mode: taller height to account for safe areas */
+@media (display-mode: standalone) {
+  .reader-toolbar-height {
+    top: -90px;
+    height: 270px;
+    padding-top: 90px;
+  }
 }
 
 /* Grammar breakdown modal width constraint */
 .grammar-breakdown-backdrop {
   --backdrop: rgba(0, 0, 0, 0.5);
+  z-index: 1;
 }
 
 #grammar-breakdown-portal > div > div {
   --width: min(100%, 800px);
 }
+
+/* Hide Swiper navigation buttons completely */
+.swiper-button-next,
+.swiper-button-prev {
+  display: none !important;
+}
+
+/* Hide all Swiper navigation elements */
+.swiper-button-next:after,
+.swiper-button-prev:after {
+  display: none !important;
+}
+
+/* Ensure navigation container is hidden */
+.swiper-navigation-disabled .swiper-button-next,
+.swiper-navigation-disabled .swiper-button-prev {
+  display: none !important;
+  opacity: 0 !important;
+  visibility: hidden !important;
+}
+
 
