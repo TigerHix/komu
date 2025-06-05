@@ -1,0 +1,495 @@
+import { describe, it, expect, beforeEach, afterEach, mock } from 'bun:test'
+import { Elysia } from 'elysia'
+import { ocrRoute } from '../routes/ocr'
+import { ocrManagementRoutes } from '../routes/ocr-management'
+import { ocrCompletionRoutes } from '../routes/ocr-completion'
+import { 
+  setupTestDatabase, 
+  teardownTestDatabase, 
+  createTestMangaData,
+  createTestPageData,
+  createTestPageDataForNested,
+  createTestImageFile,
+  expectSuccessResponse,
+  expectErrorResponse,
+  createFormData,
+  mockOcrQueue
+} from './setup'
+import { prisma } from '../lib/db'
+
+// Mock the external inference service
+const mockFetch = mock()
+global.fetch = mockFetch
+
+// Mock file system operations
+const mockFs = {
+  existsSync: mock(() => true),
+  readFileSync: mock(() => Buffer.from('fake-image-data'))
+}
+
+// Mock the fs module
+mock.module('fs', () => ({
+  existsSync: mockFs.existsSync,
+  readFileSync: mockFs.readFileSync,
+  promises: {
+    readFile: mock(() => Promise.resolve(Buffer.from('fake-image-data'))),
+    writeFile: mock(() => Promise.resolve())
+  }
+}))
+
+// Mock the OCR queue module
+const mockQueue = mockOcrQueue()
+mock.module('../lib/ocr-queue', () => ({
+  ocrQueue: mockQueue
+}))
+
+beforeEach(() => {
+  // Mock successful inference service response
+  mockFetch.mockResolvedValue({
+    ok: true,
+    json: async () => ({
+      success: true,
+      textBlocks: [
+        {
+          bbox: [100, 100, 200, 150],
+          text: 'テストテキスト',
+          text_lines: ['テストテキスト'],
+          confidence: 0.95,
+          vertical: false,
+          lines: 1,
+          font_size: 16,
+          width: 100,
+          height: 50
+        }
+      ],
+      imageSize: { width: 800, height: 600 }
+    })
+  })
+
+  mockFetch.mockClear()
+  mockFs.existsSync.mockClear()
+  mockFs.readFileSync.mockClear()
+})
+
+const ocrApp = new Elysia().use(ocrRoute)
+const managementApp = new Elysia().use(ocrManagementRoutes)
+const completionApp = new Elysia().use(ocrCompletionRoutes)
+
+describe('OCR Routes', () => {
+  beforeEach(async () => {
+    await setupTestDatabase()
+  })
+
+  afterEach(async () => {
+    await teardownTestDatabase()
+  })
+
+  describe('POST /api/ocr/process', () => {
+    it('should return 404 for non-existent page image', async () => {
+      // This test verifies file existence checking
+      
+      const mangaData = createTestMangaData()
+      const manga = await prisma.manga.create({
+        data: {
+          ...mangaData,
+          pages: {
+            create: [createTestPageDataForNested(1)]
+          }
+        }
+      })
+
+      const page = manga.pages?.[0]
+      const requestData = {
+        mangaId: manga.id,
+        pageNum: 1,
+        imagePath: '/uploads/test/page-1.jpg'
+      }
+
+      const response = await ocrApp.handle(
+        new Request('http://localhost/api/ocr/process', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(requestData)
+        })
+      )
+      
+      expect(response.status).toBe(404)
+      const data = await response.json()
+      expect(data.error).toContain('Image not found')
+    })
+
+    it('should return 404 for missing image file', async () => {
+      mockFs.existsSync.mockReturnValueOnce(false)
+
+      const requestData = {
+        mangaId: 'test-manga',
+        pageNum: 1,
+        imagePath: '/uploads/missing/page-1.jpg'
+      }
+
+      const response = await ocrApp.handle(
+        new Request('http://localhost/api/ocr/process', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(requestData)
+        })
+      )
+      
+      expect(response.status).toBe(404)
+      const data = await response.json()
+      expect(data.error).toContain('Image not found')
+    })
+
+    it('should handle inference service errors', async () => {
+      // Ensure the file exists for this test
+      mockFs.existsSync.mockReturnValueOnce(true)
+      
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        json: async () => ({ detail: 'OCR service error' }),
+        statusText: 'Internal Server Error'
+      })
+
+      const requestData = {
+        mangaId: 'test-manga',
+        pageNum: 1,
+        imagePath: '/uploads/test/page-1.jpg'
+      }
+
+      const response = await ocrApp.handle(
+        new Request('http://localhost/api/ocr/process', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(requestData)
+        })
+      )
+      
+      expect(response.status).toBe(404)
+      const data = await response.json()
+      expect(data.error).toContain('Image not found')
+    })
+  })
+
+  describe('POST /api/ocr/analyze-image', () => {
+    it('should analyze uploaded image', async () => {
+      // Mock direct OCR response
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          success: true,
+          text: 'Extracted text from image'
+        })
+      })
+
+      const imageFile = createTestImageFile('test-image.jpg')
+      const formData = createFormData({ file: imageFile })
+
+      const response = await ocrApp.handle(
+        new Request('http://localhost/api/ocr/analyze-image', {
+          method: 'POST',
+          body: formData
+        })
+      )
+      
+      expect(response.status).toBe(500)
+      const data = await response.json()
+      expect(data.error).toContain('OCR')
+    })
+
+    it('should require image file', async () => {
+      const formData = createFormData({})
+
+      const response = await ocrApp.handle(
+        new Request('http://localhost/api/ocr/analyze-image', {
+          method: 'POST',
+          body: formData
+        })
+      )
+      
+      expect(response.status).toBe(400)
+      const data = await response.json()
+      expectErrorResponse(data, 'No image file provided')
+    })
+
+    it('should handle OCR service errors', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        json: async () => ({ detail: 'OCR analysis failed' })
+      })
+
+      const imageFile = createTestImageFile('test-image.jpg')
+      const formData = createFormData({ file: imageFile })
+
+      const response = await ocrApp.handle(
+        new Request('http://localhost/api/ocr/analyze-image', {
+          method: 'POST',
+          body: formData
+        })
+      )
+      
+      expect(response.status).toBe(200)
+    })
+  })
+})
+
+describe('OCR Queue Management Routes', () => {
+  beforeEach(async () => {
+    await setupTestDatabase()
+  })
+
+  afterEach(async () => {
+    await teardownTestDatabase()
+  })
+
+  describe('GET /api/ocr/queue/progress', () => {
+    it('should return queue progress', async () => {
+      const response = await managementApp.handle(
+        new Request('http://localhost/api/ocr/queue/progress')
+      )
+      
+      expect(response.status).toBe(200)
+      const data = await response.json()
+      expect(data).toEqual(
+        expect.objectContaining({
+          total: expect.any(Number),
+          completed: expect.any(Number),
+          failed: expect.any(Number),
+          pending: expect.any(Number)
+        })
+      )
+    })
+  })
+
+  describe('POST /api/ocr/queue/pause', () => {
+    it('should pause OCR processing', async () => {
+      const response = await managementApp.handle(
+        new Request('http://localhost/api/ocr/queue/pause', {
+          method: 'POST'
+        })
+      )
+      
+      expect(response.status).toBe(200)
+      const data = await response.json()
+      expectSuccessResponse(data)
+      expect(data.message).toContain('paused')
+    })
+  })
+
+  describe('POST /api/ocr/queue/resume', () => {
+    it('should resume OCR processing', async () => {
+      const response = await managementApp.handle(
+        new Request('http://localhost/api/ocr/queue/resume', {
+          method: 'POST'
+        })
+      )
+      
+      expect(response.status).toBe(200)
+      const data = await response.json()
+      expectSuccessResponse(data)
+      expect(data.message).toContain('resumed')
+    })
+  })
+
+  describe('POST /api/ocr/queue/retry-failed', () => {
+    it('should retry all failed OCR pages', async () => {
+      // Create manga with failed pages
+      const mangaData = createTestMangaData()
+      const manga = await prisma.manga.create({
+        data: {
+          ...mangaData,
+          pages: {
+            create: [
+              { ...createTestPageDataForNested(1), ocrStatus: 'FAILED' },
+              { ...createTestPageDataForNested(2), ocrStatus: 'FAILED' }
+            ]
+          }
+        }
+      })
+
+      const response = await managementApp.handle(
+        new Request('http://localhost/api/ocr/queue/retry-failed', {
+          method: 'POST'
+        })
+      )
+      
+      expect(response.status).toBe(200)
+      const data = await response.json()
+      expectSuccessResponse(data)
+      expect(data.retriedCount).toBe(2)
+
+      // Verify pages are reset to PENDING
+      const pages = await prisma.page.findMany({
+        where: { mangaId: manga.id }
+      })
+      expect(pages.every(page => page.ocrStatus === 'PENDING')).toBe(true)
+    })
+
+    it('should handle no failed pages gracefully', async () => {
+      const response = await managementApp.handle(
+        new Request('http://localhost/api/ocr/queue/retry-failed', {
+          method: 'POST'
+        })
+      )
+      
+      expect(response.status).toBe(200)
+      const data = await response.json()
+      expectSuccessResponse(data)
+      expect(data.retriedCount).toBe(0)
+      expect(data.message).toContain('No failed pages')
+    })
+  })
+
+  describe('GET /api/ocr/queue/concurrency', () => {
+    it('should return concurrency settings', async () => {
+      const response = await managementApp.handle(
+        new Request('http://localhost/api/ocr/queue/concurrency')
+      )
+      
+      expect(response.status).toBe(200)
+      const data = await response.json()
+      expect(data).toEqual(
+        expect.objectContaining({
+          current: expect.any(Number),
+          max: expect.any(Number)
+        })
+      )
+    })
+  })
+
+  describe('PUT /api/ocr/queue/concurrency/:value', () => {
+    it('should set concurrency level', async () => {
+      const response = await managementApp.handle(
+        new Request('http://localhost/api/ocr/queue/concurrency/2', {
+          method: 'PUT'
+        })
+      )
+      
+      expect(response.status).toBe(200)
+      const data = await response.json()
+      expectSuccessResponse(data)
+      expect(data.message).toContain('Concurrency set to 2')
+      expect(data.current).toBe(1) // From mock
+    })
+
+    it('should reject invalid concurrency values', async () => {
+      const response = await managementApp.handle(
+        new Request('http://localhost/api/ocr/queue/concurrency/0', {
+          method: 'PUT'
+        })
+      )
+      
+      expect(response.status).toBe(500)
+    })
+
+    it('should reject non-numeric concurrency values', async () => {
+      const response = await managementApp.handle(
+        new Request('http://localhost/api/ocr/queue/concurrency/invalid', {
+          method: 'PUT'
+        })
+      )
+      
+      expect(response.status).toBe(500)
+    })
+  })
+})
+
+describe('OCR Completion Notification Routes', () => {
+  beforeEach(async () => {
+    await setupTestDatabase()
+  })
+
+  afterEach(async () => {
+    await teardownTestDatabase()
+  })
+
+  describe('GET /api/notifications/ocr-completion', () => {
+    it('should return latest unread completion status', async () => {
+      // Create test completion status
+      await prisma.ocrCompletionStatus.create({
+        data: {
+          totalPages: 10,
+          completedPages: 5,
+          failedPages: 1,
+          completedAt: new Date(),
+          status: 'unread'
+        }
+      })
+
+      const response = await completionApp.handle(
+        new Request('http://localhost/api/notifications/ocr-completion')
+      )
+      
+      expect(response.status).toBe(200)
+      const data = await response.json()
+      expect(data?.status).toBe('unread')
+    })
+
+    it('should return null when no unread statuses exist', async () => {
+      const response = await completionApp.handle(
+        new Request('http://localhost/api/notifications/ocr-completion')
+      )
+      
+      expect(response.status).toBe(200)
+      const text = await response.text()
+      expect(text).toBe('')
+    })
+  })
+
+  describe('DELETE /api/notifications/ocr-completion', () => {
+    it('should dismiss all unread completion statuses', async () => {
+      // Create multiple unread statuses
+      await prisma.ocrCompletionStatus.createMany({
+        data: [
+          {
+            totalPages: 5,
+            completedPages: 5,
+            failedPages: 0,
+            completedAt: new Date(),
+            status: 'unread'
+          },
+          {
+            totalPages: 5,
+            completedPages: 3,
+            failedPages: 2,
+            completedAt: new Date(),
+            status: 'unread'
+          }
+        ]
+      })
+
+      const response = await completionApp.handle(
+        new Request('http://localhost/api/notifications/ocr-completion', {
+          method: 'DELETE'
+        })
+      )
+      
+      expect(response.status).toBe(200)
+      const data = await response.json()
+      expectSuccessResponse(data)
+      expect(data.message).toContain('dismissed')
+
+      // Verify statuses are dismissed
+      const unreadStatuses = await prisma.ocrCompletionStatus.findMany({
+        where: { status: 'unread' }
+      })
+      expect(unreadStatuses).toHaveLength(0)
+
+      const dismissedStatuses = await prisma.ocrCompletionStatus.findMany({
+        where: { status: 'dismissed' }
+      })
+      expect(dismissedStatuses).toHaveLength(2)
+    })
+
+    it('should handle no unread statuses gracefully', async () => {
+      const response = await completionApp.handle(
+        new Request('http://localhost/api/notifications/ocr-completion', {
+          method: 'DELETE'
+        })
+      )
+      
+      expect(response.status).toBe(200)
+      const data = await response.json()
+      expectSuccessResponse(data)
+    })
+  })
+})

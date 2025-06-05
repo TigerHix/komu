@@ -40,7 +40,7 @@
     --muted: 217 10% 95%; /* Very light gray */
     --muted-foreground: 220 6% 46%; /* Medium gray text */
     
-    --accent: 142 65% 28%; /* Darker matcha green */
+    --accent: 74 26% 45%; /* New theme color #849255 */
     --accent-foreground: 0 0% 100%;
     
     --destructive: 0 100% 50%; /* Apple red */
@@ -83,7 +83,7 @@
     --muted: 220 13% 15%;
     --muted-foreground: 220 6% 65%;
     
-    --accent: 142 55% 35%; /* Darker matcha green for dark mode */
+    --accent: 74 26% 55%; /* New theme color for dark mode */
     --accent-foreground: 220 13% 6%;
     
     --destructive: 0 86% 59%; /* Apple red for dark */
@@ -347,6 +347,7 @@
     user-select: text !important;
   }
   
+  
   /* Custom text selection colors */
   .select-text::selection {
     background: hsl(var(--accent) / 0.2);
@@ -378,12 +379,12 @@
   }
   
   .select-definition::selection {
-    background: hsl(142 55% 35% / 0.25);
+    background: hsl(74 26% 55% / 0.25);
     color: hsl(var(--foreground));
   }
   
   .select-definition::-moz-selection {
-    background: hsl(142 55% 35% / 0.25);
+    background: hsl(74 26% 55% / 0.25);
     color: hsl(var(--foreground));
   }
 }
@@ -469,6 +470,30 @@
   display: none !important;
   opacity: 0 !important;
   visibility: hidden !important;
+}
+
+/* Reader bottom panel with Apple Design-level theming - optimized for readability */
+.reader-bottom-panel {
+  border-radius: 20px;
+  /* Light mode styling - solid background for better readability over white manga pages */
+  background: hsl(var(--surface-1));
+  border: 0.5px solid hsl(var(--border) / 0.2);
+  box-shadow: 
+    0 8px 32px hsla(var(--foreground), 0.12),
+    0 2px 8px hsla(var(--foreground), 0.06),
+    inset 0 1px 0 hsla(var(--background), 0.9);
+}
+
+/* Dark mode reader bottom panel - keep blur for dark backgrounds */
+.dark .reader-bottom-panel {
+  background: rgba(28, 28, 30, 0.98);
+  backdrop-filter: blur(40px) saturate(180%);
+  -webkit-backdrop-filter: blur(40px) saturate(180%);
+  border: 0.5px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 
+    0 8px 32px rgba(0, 0, 0, 0.3),
+    0 2px 8px rgba(0, 0, 0, 0.15),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
 }
 
 

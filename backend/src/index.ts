@@ -9,8 +9,10 @@ import { metadataRoutes } from './routes/metadata'
 import { ocrRoute } from './routes/ocr'
 import { ocrManagementRoutes } from './routes/ocr-management'
 import { ocrCompletionRoutes } from './routes/ocr-completion'
-import { readerRoutes } from './routes/reader'
+import { pagesRoutes } from './routes/pages'
 import { tokenizeRoutes } from './routes/tokenize'
+import { textBlocksRoutes } from './routes/text-blocks'
+import { chatRoutes } from './routes/chat'
 import { ocrQueue } from './lib/ocr-queue'
 import { wsManager } from './lib/websocket'
 import { checkAndCleanIncompleteOcrData } from './lib/startup-check'
@@ -42,8 +44,10 @@ const app = new Elysia({
   .use(ocrRoute)
   .use(ocrManagementRoutes)
   .use(ocrCompletionRoutes)
-  .use(readerRoutes)
+  .use(pagesRoutes)
   .use(tokenizeRoutes)
+  .use(textBlocksRoutes)
+  .use(chatRoutes)
   .ws('/ws', {
     body: t.Object({
       type: t.String(),

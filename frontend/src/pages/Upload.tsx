@@ -38,7 +38,7 @@ export default function Upload() {
       const formData = new FormData()
       formData.append('file', file)
 
-      const response = await fetch('/api/upload', {
+      const response = await fetch('/api/manga/from-pdf', {
         method: 'POST',
         body: formData
       })

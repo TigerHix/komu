@@ -5,8 +5,8 @@ import { ocrQueue } from '../lib/ocr-queue'
 import { promises as fs } from 'fs'
 import path from 'path'
 
-export const uploadRoutes = new Elysia({ prefix: '/api' })
-  .post('/upload-images', async ({ body }) => {
+export const uploadRoutes = new Elysia({ prefix: '/api/manga' })
+  .post('/from-images', async ({ body }) => {
     console.log('Uploading images started')
     const formData = body as any
     
@@ -94,7 +94,7 @@ export const uploadRoutes = new Elysia({ prefix: '/api' })
     body: t.Any(),
     type: 'formdata'
   })
-  .post('/upload', async ({ body }) => {
+  .post('/from-pdf', async ({ body }) => {
     console.log('Uploading file started')
     const { file } = body as { file: File }
     

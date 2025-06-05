@@ -30,7 +30,7 @@ export const mangaRoutes = new Elysia({ prefix: '/api' })
     return manga.map(m => ({
       ...m,
       totalPages: m._count.pages,
-      progressPercent: m._count.pages > 0 ? Math.round((m.currentPage / m._count.pages) * 100) : 0
+      progressPercent: m._count.pages > 0 && m.currentPage > 0 ? Math.round((m.currentPage / m._count.pages) * 100) : 0
     }))
   })
   
@@ -85,7 +85,7 @@ export const mangaRoutes = new Elysia({ prefix: '/api' })
     return { success: true, message: 'Manga deleted successfully' }
   })
 
-  .post('/manga/:id/remove-ocr', async ({ params }) => {
+  .delete('/manga/:id/ocr', async ({ params }) => {
     // Get all pages for this manga
     const pages = await prisma.page.findMany({
       where: { mangaId: params.id },
@@ -140,7 +140,7 @@ export const mangaRoutes = new Elysia({ prefix: '/api' })
     }
   })
 
-  .put('/manga/:id/last-read', async ({ params }) => {
+  .put('/manga/:id/reading-session', async ({ params }) => {
     // Update last read timestamp when manga is opened
     const manga = await prisma.manga.findUnique({
       where: { id: params.id }
@@ -195,6 +195,6 @@ export const mangaRoutes = new Elysia({ prefix: '/api' })
     return { 
       success: true, 
       currentPage,
-      progressPercent: Math.round((currentPage / manga._count.pages) * 100)
+      progressPercent: currentPage > 0 ? Math.round((currentPage / manga._count.pages) * 100) : 0
     }
   })

@@ -4,7 +4,7 @@ generator client {
 
 datasource db {
   provider = "sqlite"
-  url      = "file:./dev.db"
+  url      = env("DATABASE_URL")
 }
 
 model Manga {
@@ -15,7 +15,7 @@ model Manga {
   author      String?
   description String?
   thumbnail   String?  // Path to thumbnail image
-  currentPage Int      @default(0) // 0-based index of last read page
+  currentPage Int      @default(0) // 1-based page number of last read page, 0 = not read
   lastReadAt  DateTime? // Last time this manga was opened/read
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt

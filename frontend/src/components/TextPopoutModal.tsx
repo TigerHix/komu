@@ -104,6 +104,7 @@ export function TextPopoutModal({
     }
   }, [isOpen, selectedBlock, imagePath, imageSize])
 
+
   // Cleanup on unmount
   useEffect(() => {
     return () => {
@@ -144,20 +145,20 @@ export function TextPopoutModal({
             initial={{ 
               opacity: 0,
               scale: 0.1,
-              x: originalPosition ? originalPosition.x - window.innerWidth / 2 : 0,
-              y: originalPosition ? originalPosition.y - (window.innerHeight * 0.25) : 0,
+              left: originalPosition ? `${originalPosition.x - displayWidth / 2}px` : `calc(50vw - ${displayWidth / 2}px)`,
+              top: originalPosition ? `${originalPosition.y - displayHeight / 2}px` : `calc(25vh - ${displayHeight / 2}px)`,
             }}
             animate={{ 
-              opacity: Math.max(0, 1 - sheetProgress), // Smooth fade based on progress
+              opacity: Math.max(0, 1 - sheetProgress),
               scale: 1,
-              x: 0,
-              y: 0,
+              left: `calc(50vw - ${displayWidth / 2}px)`,
+              top: `calc(25vh - ${displayHeight / 2}px)`,
             }}
             exit={{ 
               opacity: 0,
               scale: 0.1,
-              x: originalPosition ? originalPosition.x - window.innerWidth / 2 : 0,
-              y: originalPosition ? originalPosition.y - (window.innerHeight * 0.25) : 0,
+              left: originalPosition ? `${originalPosition.x - displayWidth / 2}px` : `calc(50vw - ${displayWidth / 2}px)`,
+              top: originalPosition ? `${originalPosition.y - displayHeight / 2}px` : `calc(25vh - ${displayHeight / 2}px)`,
             }}
             transition={{
               type: "spring",
@@ -168,14 +169,8 @@ export function TextPopoutModal({
                 ease: "easeOut"
               }
             }}
-            className="fixed pointer-events-none flex items-center justify-center"
+            className="fixed pointer-events-none"
             style={{
-              top: '25vh',
-              left: '50vw',
-              width: `${displayWidth}px`,
-              height: `${displayHeight}px`,
-              marginLeft: `-${displayWidth / 2}px`, // Half of width for perfect centering
-              marginTop: `-${displayHeight / 2}px`,  // Half of height for perfect centering
               zIndex: 2 // Above backdrop (z-index: 1)
             }}
           >
@@ -192,8 +187,8 @@ export function TextPopoutModal({
             }}
             className="bg-surface-1/95 backdrop-blur-xl rounded-2xl border border-green-500/30 shadow-2xl overflow-hidden relative"
             style={{
-              width: '100%',
-              height: '100%',
+              width: `${displayWidth}px`,
+              height: `${displayHeight}px`,
               boxShadow: `
                 0 0 20px rgba(34, 197, 94, 0.3),
                 0 8px 32px rgba(0, 0, 0, 0.4),

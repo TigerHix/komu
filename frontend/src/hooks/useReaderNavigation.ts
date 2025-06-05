@@ -18,6 +18,7 @@ interface NavigationProps {
   zoom?: number
   isDragging?: boolean
   onDoubleClickZoom?: (centerX: number, centerY: number) => void
+  disableKeyboard?: boolean
 }
 
 export function useReaderNavigation({
@@ -31,7 +32,8 @@ export function useReaderNavigation({
   onPageChange,
   zoom = 1,
   isDragging = false,
-  onDoubleClickZoom
+  onDoubleClickZoom,
+  disableKeyboard = false
 }: NavigationProps) {
   const navigate = useNavigate()
   const [lastTap, setLastTap] = useState(0)
@@ -131,9 +133,9 @@ export function useReaderNavigation({
     setLastTap(now)
   }, [lastTap, onDoubleClickZoom])
 
-  // Keyboard navigation - disabled for scrolling mode
+  // Keyboard navigation - disabled for scrolling mode and when modals are open
   useEffect(() => {
-    if (readingMode === 'scrolling') return // Let react-window handle scrolling
+    if (readingMode === 'scrolling' || disableKeyboard) return
 
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'ArrowLeft' || e.key === 'a') {
@@ -155,7 +157,7 @@ export function useReaderNavigation({
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [nextPage, prevPage, navigate, readingMode])
+  }, [nextPage, prevPage, navigate, readingMode, disableKeyboard])
 
   return {
     nextPage,

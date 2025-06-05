@@ -43,7 +43,7 @@ function AppContent() {
 
   const handleRetryFailed = async () => {
     try {
-      const response = await fetch('/api/ocr/retry-failed', { method: 'POST' })
+      const response = await fetch('/api/ocr/queue/retry-failed', { method: 'POST' })
       if (!response.ok) {
         throw new Error('Failed to retry failed pages')
       }

@@ -80,6 +80,9 @@ function ScrollingSlide({ index, style, data }: ScrollingSlideProps) {
             isGrammarOpen={isGrammarOpen}
             selectedBlockIndex={selectedBlockIndex}
             pageIndex={index}
+            touchStartTime={0}
+            lastTouchMoveTime={0}
+            isZoomed={false}
           />
         )}
       </div>

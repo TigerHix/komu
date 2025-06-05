@@ -1,8 +1,8 @@
 import { Elysia } from 'elysia'
 import { prisma } from '../lib/db'
 
-export const ocrCompletionRoutes = new Elysia({ prefix: '/api/ocr' })
-  .get('/completion-status', async () => {
+export const ocrCompletionRoutes = new Elysia({ prefix: '/api/notifications' })
+  .get('/ocr-completion', async () => {
     // Get the most recent unread completion status
     const status = await prisma.ocrCompletionStatus.findFirst({
       where: { status: 'unread' },
@@ -12,7 +12,7 @@ export const ocrCompletionRoutes = new Elysia({ prefix: '/api/ocr' })
     return status
   })
 
-  .post('/completion-status/dismiss', async () => {
+  .delete('/ocr-completion', async () => {
     // Mark all unread completion statuses as dismissed
     await prisma.ocrCompletionStatus.updateMany({
       where: { status: 'unread' },

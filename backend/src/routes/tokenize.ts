@@ -1,8 +1,8 @@
 import { Elysia, t } from 'elysia'
 import { ichiranService } from '../lib/ichiran-service'
 
-export const tokenizeRoutes = new Elysia({ prefix: '/api/tokenize' })
-  .post('/', async ({ body }) => {
+export const tokenizeRoutes = new Elysia({ prefix: '/api/japanese' })
+  .post('/tokenize', async ({ body }) => {
     const { text } = body
     
     if (!text || typeof text !== 'string') {
@@ -20,21 +20,29 @@ export const tokenizeRoutes = new Elysia({ prefix: '/api/tokenize' })
     })
   })
   
-  .get('/health', async () => {
-    const available = await ichiranService.isAvailable()
-    return {
-      service: 'ichiran',
-      available,
-      status: available ? 'ready' : 'unavailable',
-      config: ichiranService.getConfig()
+  .get('/tokenizer/health', async () => {
+    try {
+      const available = await ichiranService.isAvailable()
+      return {
+        service: 'ichiran',
+        available,
+        status: available ? 'ready' : 'unavailable',
+        config: ichiranService.getConfig()
+      }
+    } catch (error) {
+      return {
+        service: 'ichiran',
+        available: false,
+        status: 'unavailable'
+      }
     }
   })
 
-  .get('/config', () => {
+  .get('/tokenizer/config', () => {
     return ichiranService.getConfig()
   })
 
-  .post('/restart', async () => {
+  .post('/tokenizer/restart', async () => {
     try {
       await ichiranService.restart()
       return {
@@ -46,7 +54,7 @@ export const tokenizeRoutes = new Elysia({ prefix: '/api/tokenize' })
     }
   })
   
-  .post('/alternatives/:text', async ({ params }) => {
+  .post('/tokenize/alternatives/:text', async ({ params }) => {
     const { text } = params
     
     if (!text) {

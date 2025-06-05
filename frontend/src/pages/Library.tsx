@@ -107,7 +107,7 @@ export default function Library() {
 
   const fetchOcrCompletionStatus = async () => {
     try {
-      const response = await fetch('/api/ocr/completion-status')
+      const response = await fetch('/api/notifications/ocr-completion')
       if (response.ok) {
         const text = await response.text()
         if (text) {
@@ -124,11 +124,11 @@ export default function Library() {
 
   const handleRetryFailed = async () => {
     try {
-      const response = await fetch('/api/ocr/retry-failed', { method: 'POST' })
+      const response = await fetch('/api/ocr/queue/retry-failed', { method: 'POST' })
       if (response.ok) {
         // Clear the status and refresh
         setOcrStatus(null)
-        await fetch('/api/ocr/completion-status/dismiss', { method: 'POST' })
+        await fetch('/api/notifications/ocr-completion', { method: 'DELETE' })
       }
     } catch (error) {
       console.error('Error retrying failed pages:', error)

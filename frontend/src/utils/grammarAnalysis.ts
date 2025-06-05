@@ -372,7 +372,7 @@ export interface GrammarToken {
  */
 export async function analyzeGrammar(text: string): Promise<GrammarToken[]> {
   try {
-    const response = await fetch('/api/tokenize', {
+    const response = await fetch('/api/japanese/tokenize', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -884,14 +884,6 @@ function extractCompoundStructure(wordInfo: IchiranWordInfo): { parts: string[];
     parts: wordInfo.compound,
     components,
   }
-}
-
-/**
- * Check if text contains Japanese characters (for validation)
- */
-export function containsJapanese(text: string): boolean {
-  const japaneseRegex = /[\u3040-\u309F\u30A0-\u30FF\u31F0-\u31FF\u3400-\u4DBF\u4E00-\u9FFF]/
-  return japaneseRegex.test(text)
 }
 
 /**

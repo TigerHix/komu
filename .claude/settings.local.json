@@ -45,7 +45,9 @@
       "Bash(npm run build:*)",
       "Bash(cat:*)",
       "Bash(convert:*)",
-      "Bash(pnpm build:*)"
+      "Bash(pnpm build:*)",
+      "Bash(bun test)",
+      "Bash(bun test:*)"
     ],
     "deny": []
   }

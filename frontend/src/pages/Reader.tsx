@@ -8,11 +8,11 @@ import { GrammarBreakdown } from '@/components/GrammarBreakdown'
 import { SwiperGallery } from '@/components/SwiperGallery'
 import { ScrollingGallery } from '@/components/ScrollingGallery'
 import { TextPopoutModal } from '@/components/TextPopoutModal'
-import { analyzeGrammar, containsJapanese, cleanTextForAnalysis, type GrammarToken } from '@/utils/grammarAnalysis'
-import { calculateTextBlockScreenPosition } from '@/utils/coordinates'
+import { analyzeGrammar, cleanTextForAnalysis, type GrammarToken } from '@/utils/grammarAnalysis'
 import { useOcrService } from '@/hooks/useOcrService'
 import { useReaderNavigation } from '@/hooks/useReaderNavigation'
 import { useReaderDebug } from '@/hooks/useReaderDebug'
+import { useDarkMode } from '@/hooks/useDarkMode'
 import { ReadingMode, Manga, TextBlock, READER_CONSTANTS } from '@/constants/reader'
 
 export default function Reader() {
@@ -45,9 +45,11 @@ export default function Reader() {
   const [selectedBlockIndex, setSelectedBlockIndex] = useState<number | null>(null)
   const [selectedBlock, setSelectedBlock] = useState<TextBlock | null>(null)
   const [selectedPageIndex, setSelectedPageIndex] = useState<number | null>(null)
-  const [originalPosition, setOriginalPosition] = useState<{ x: number; y: number } | null>(null)
+  const [selectedTextBlockId, setSelectedTextBlockId] = useState<string | null>(null)
+  const [clickPosition, setClickPosition] = useState<{ x: number; y: number } | null>(null)
   const [showExitTransition, setShowExitTransition] = useState(false)
   const [sheetProgress, setSheetProgress] = useState(0)
+  const [isEditingOcrText, setIsEditingOcrText] = useState(false)
   const [progressBarValue, setProgressBarValue] = useState(() => {
     if (urlPage) {
       const pageNum = parseInt(urlPage, 10) - 1 // Convert to 0-based index
@@ -94,6 +96,7 @@ export default function Reader() {
   // Custom hooks
   const ocrService = useOcrService()
   const { debugCurrentState } = useReaderDebug()
+  const { isDarkMode } = useDarkMode()
 
   const handlePageChange = useCallback(() => {
     if (readingMode !== 'scrolling') {
@@ -109,7 +112,8 @@ export default function Reader() {
     showUI,
     setShowUI,
     setShowSettings,
-    onPageChange: handlePageChange
+    onPageChange: handlePageChange,
+    disableKeyboard: showGrammarBreakdown || showSettings || grammarAnalysisLoading || isEditingOcrText
   })
 
 
@@ -140,9 +144,9 @@ export default function Reader() {
   }, [debouncedPageChange])
 
   // Handle text block clicks for grammar analysis
-  const handleBlockClick = useCallback(async (block: TextBlock, index: number, pageIndex?: number) => {
+  const handleBlockClick = useCallback(async (block: TextBlock, index: number, pageIndex?: number, clickPosition?: { x: number; y: number }) => {
     const text = block.text?.trim()
-    if (!text || !containsJapanese(text)) return
+    if (!text) return
 
     const cleanedText = cleanTextForAnalysis(text)
     if (!cleanedText) return
@@ -152,22 +156,11 @@ export default function Reader() {
 
     const actualPageIndex = pageIndex ?? currentPage
 
-    // Calculate original screen position of the text block for animation
-    const blockImageSize = readingMode === 'scrolling' 
-      ? ocrService.scrollImageSizes[actualPageIndex] 
-      : ocrService.singlePageImageSize
-
-    if (blockImageSize) {
-      const screenPos = calculateTextBlockScreenPosition(
-        block,
-        blockImageSize,
-        readingMode,
-        actualPageIndex,
-        currentPage
-      )
-      setOriginalPosition(screenPos)
+    // Use the actual click position for animation
+    if (clickPosition) {
+      setClickPosition(clickPosition)
     } else {
-      setOriginalPosition(null)
+      setClickPosition(null)
     }
 
     // Track which block was selected
@@ -175,6 +168,7 @@ export default function Reader() {
     setSelectedBlock(block)
     setSelectedPageIndex(actualPageIndex)
     setSelectedSentence(text)
+    setSelectedTextBlockId(block.id || null)
     setShowGrammarBreakdown(true)
     setGrammarAnalysisLoading(true)
     setGrammarTokens([])
@@ -197,9 +191,77 @@ export default function Reader() {
     setSelectedBlockIndex(null)
     setSelectedBlock(null)
     setSelectedPageIndex(null)
-    setOriginalPosition(null)
+    setSelectedTextBlockId(null)
+    setClickPosition(null)
     setSheetProgress(0)
   }, [])
+
+  // Handle text update from OCR editing
+  const handleTextUpdate = useCallback(async (newText: string) => {
+    // Update the selected sentence and re-analyze grammar
+    setSelectedSentence(newText)
+    setGrammarAnalysisLoading(true)
+    setGrammarTokens([])
+
+    // Ensure grammar breakdown modal stays open during re-analysis
+    setShowGrammarBreakdown(true)
+
+    try {
+      const tokens = await analyzeGrammar(cleanTextForAnalysis(newText))
+      setGrammarTokens(tokens)
+    } catch (error) {
+      console.error('Failed to re-analyze grammar:', error)
+    } finally {
+      setGrammarAnalysisLoading(false)
+    }
+
+    // Update the text block in the OCR service cache
+    if (selectedBlock && selectedPageIndex !== null) {
+      // Force refresh of OCR data to reflect the database update
+      const actualPageIndex = selectedPageIndex ?? currentPage
+      if (readingMode === 'scrolling') {
+        ocrService.resetScrollPageData(actualPageIndex)
+        if (manga?.pages[actualPageIndex]) {
+          ocrService.checkScrollPageOcr(actualPageIndex, manga.pages[actualPageIndex])
+        }
+      } else {
+        ocrService.resetSinglePageData()
+        if (manga?.pages[actualPageIndex]) {
+          ocrService.checkSinglePageOcr(manga.pages[actualPageIndex].id)
+        }
+      }
+    }
+  }, [selectedBlock, selectedPageIndex, currentPage, readingMode, manga, ocrService])
+
+  // Handle refetch of text blocks after OCR text update  
+  const handleRefetchTextBlocks = useCallback((newText: string, textBlockId?: string) => {
+    const blockId = textBlockId || selectedTextBlockId
+    const pageIndex = selectedPageIndex !== null ? selectedPageIndex : currentPage
+    
+    console.log('Reader: handleRefetchTextBlocks called', { 
+      newText, 
+      textBlockId,
+      blockId,
+      selectedTextBlockId, 
+      selectedPageIndex, 
+      pageIndex,
+      currentPage, 
+      readingMode 
+    })
+    
+    if (blockId) {
+      // Immediately update the text block in the OCR service cache
+      console.log('Reader: Calling ocrService.updateTextBlock', { blockId, newText, pageIndex })
+      ocrService.updateTextBlock(blockId, newText, pageIndex)
+      
+      // Update the selected block state immediately
+      if (selectedBlock) {
+        const updatedBlock = { ...selectedBlock, text: newText }
+        setSelectedBlock(updatedBlock)
+        console.log('Reader: Updated selected block with new text:', newText)
+      }
+    }
+  }, [selectedTextBlockId, selectedPageIndex, currentPage, selectedBlock, ocrService, readingMode])
 
   // Lock body scroll with iOS fixed positioning for translucent status bar
   useEffect(() => {
@@ -317,7 +379,7 @@ export default function Reader() {
         setManga(data)
         
         // Update lastReadAt timestamp when manga is opened
-        fetch(`/api/manga/${id}/last-read`, {
+        fetch(`/api/manga/${id}/reading-session`, {
           method: 'PUT'
         }).catch(error => console.error('Failed to update last read timestamp:', error))
         
@@ -423,6 +485,9 @@ export default function Reader() {
 
   // Render reading mode content
   const renderContent = () => {
+    // Determine if keyboard should be disabled
+    const shouldDisableKeyboard = showGrammarBreakdown || showSettings || grammarAnalysisLoading || isEditingOcrText
+    
     const baseProps = {
       pages: manga.pages,
       currentPageIndex: currentPage,
@@ -452,6 +517,7 @@ export default function Reader() {
             imageSize={ocrService.singlePageImageSize}
             isGrammarOpen={showGrammarBreakdown}
             selectedBlockIndex={selectedBlockIndex}
+            disableKeyboard={shouldDisableKeyboard}
           />
         )}
       </div>
@@ -612,28 +678,19 @@ export default function Reader() {
               stiffness: 500,
               damping: 30
             }}
-            className="absolute z-10"
+            className="absolute z-10 reader-bottom-panel"
             style={{
               bottom: 'max(24px, env(safe-area-inset-bottom, 24px))',
               left: '16px',
-              right: '16px',
-              background: 'rgba(28, 28, 30, 0.95)',
-              backdropFilter: 'blur(40px) saturate(180%)',
-              borderRadius: '20px',
-              border: '0.5px solid rgba(255, 255, 255, 0.1)',
-              boxShadow: `
-                0 8px 32px rgba(0, 0, 0, 0.3),
-                0 2px 8px rgba(0, 0, 0, 0.15),
-                inset 0 1px 0 rgba(255, 255, 255, 0.1)
-              `
+              right: '16px'
             }}
             whileHover={{ y: -2 }}
           >
             <div className="px-6 py-4">
               <div className="flex items-center space-x-4">
                 {/* Page Counter */}
-                <div className="text-white apple-caption-1 font-medium min-w-fit">
-                  <span className="bg-white/10 px-3 py-1.5 rounded-full">
+                <div className="text-text-primary apple-caption-1 font-medium min-w-fit">
+                  <span className="bg-muted px-3 py-1.5 rounded-full">
                     {progressBarValue + 1} / {manga.pages.length}
                   </span>
                 </div>
@@ -650,11 +707,11 @@ export default function Reader() {
                       const newPage = readingMode === 'rtl' ? manga.pages.length - 1 - sliderValue : sliderValue
                       handleProgressBarChange(newPage)
                     }}
-                    className="w-full h-1.5 bg-white/20 rounded-full appearance-none cursor-default slider transition-all duration-300 hover:h-2"
+                    className="w-full h-1.5 rounded-full appearance-none cursor-default slider transition-all duration-300 hover:h-2"
                     style={{
                       background: readingMode === 'rtl' 
-                        ? `linear-gradient(to left, hsl(var(--accent)) 0%, hsl(var(--accent)) ${((progressBarValue + 1) / manga.pages.length) * 100}%, rgba(255,255,255,0.2) ${((progressBarValue + 1) / manga.pages.length) * 100}%, rgba(255,255,255,0.2) 100%)`
-                        : `linear-gradient(to right, hsl(var(--accent)) 0%, hsl(var(--accent)) ${((progressBarValue + 1) / manga.pages.length) * 100}%, rgba(255,255,255,0.2) ${((progressBarValue + 1) / manga.pages.length) * 100}%, rgba(255,255,255,0.2) 100%)`
+                        ? `linear-gradient(to left, hsl(var(--accent)) 0%, hsl(var(--accent)) ${((progressBarValue + 1) / manga.pages.length) * 100}%, hsl(var(--muted)) ${((progressBarValue + 1) / manga.pages.length) * 100}%, hsl(var(--muted)) 100%)`
+                        : `linear-gradient(to right, hsl(var(--accent)) 0%, hsl(var(--accent)) ${((progressBarValue + 1) / manga.pages.length) * 100}%, hsl(var(--muted)) ${((progressBarValue + 1) / manga.pages.length) * 100}%, hsl(var(--muted)) 100%)`
                     }}
                   />
                 </div>
@@ -670,7 +727,7 @@ export default function Reader() {
                       variant="ghost"
                       size="sm"
                       onClick={() => setShowSettings(!showSettings)}
-                      className="text-white/90 hover:text-white hover:bg-white/20 p-2 rounded-xl transition-all duration-200"
+                      className="text-text-secondary hover:text-text-primary hover:bg-surface-2 p-2 rounded-xl transition-all duration-200"
                     >
                       <Settings className="h-4 w-4" />
                     </Button>
@@ -699,7 +756,7 @@ export default function Reader() {
         }
         onClose={() => {}}
         isBottomSheetExpanded={sheetProgress > 0.3}
-        originalPosition={originalPosition}
+        originalPosition={clickPosition}
         sheetProgress={sheetProgress}
         pageIndex={selectedPageIndex ?? currentPage}
       />
@@ -710,10 +767,26 @@ export default function Reader() {
         onClose={closeGrammarBreakdown}
         tokens={grammarTokens}
         loading={grammarAnalysisLoading}
+        originalText={selectedSentence}
+        textBlockId={selectedTextBlockId}
+        onTextUpdate={handleTextUpdate}
+        selectedBlock={selectedBlock}
+        imagePath={selectedPageIndex !== null && manga?.pages[selectedPageIndex] 
+          ? manga.pages[selectedPageIndex].imagePath 
+          : (currentPageData?.imagePath || '')
+        }
+        imageSize={selectedPageIndex !== null && readingMode === 'scrolling' 
+          ? ocrService.scrollImageSizes[selectedPageIndex] || { width: 800, height: 1200 }
+          : readingMode === 'scrolling' 
+            ? ocrService.scrollImageSizes[currentPage] || { width: 800, height: 1200 }
+            : ocrService.singlePageImageSize
+        }
         onSheetExpansionChange={(progress) => {
           console.log('Reader received sheet progress:', progress)
           setSheetProgress(progress)
         }}
+        onEditingStateChange={setIsEditingOcrText}
+        onRefetchTextBlocks={handleRefetchTextBlocks}
       />
 
       <div id="grammar-breakdown-portal"></div>

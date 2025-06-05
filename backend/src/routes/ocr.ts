@@ -1,6 +1,7 @@
-import { Elysia } from 'elysia'
+import { Elysia, t } from 'elysia'
 import path from 'path'
 import fs from 'fs'
+import sharp from 'sharp'
 
 interface OCRRequest {
   mangaId: string
@@ -57,8 +58,48 @@ async function callInferenceService(imagePath: string): Promise<InferenceService
   return await response.json() as InferenceServiceResponse
 }
 
-export const ocrRoute = new Elysia({ prefix: '/api' })
-  .post('/ocr', async ({ body, set }) => {
+async function callInferenceServiceWithBuffer(imageBuffer: Buffer, filename: string): Promise<InferenceServiceResponse> {
+  const formData = new FormData()
+  
+  // Create a Blob from the buffer
+  const imageBlob = new Blob([imageBuffer], { type: 'image/jpeg' })
+  formData.append('file', imageBlob, filename)
+  
+  const response = await fetch(`${INFERENCE_SERVICE_URL}/ocr/detect`, {
+    method: 'POST',
+    body: formData
+  })
+  
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ detail: 'Unknown error' })) as InferenceServiceError
+    throw new Error(`Inference service error: ${error.detail || response.statusText}`)
+  }
+  
+  return await response.json() as InferenceServiceResponse
+}
+
+async function callInferenceServiceDirectOCR(imageBuffer: Buffer, filename: string): Promise<{ success: boolean; text?: string; error?: string }> {
+  const formData = new FormData()
+  
+  // Create a Blob from the buffer
+  const imageBlob = new Blob([imageBuffer], { type: 'image/jpeg' })
+  formData.append('file', imageBlob, filename)
+  
+  const response = await fetch(`${INFERENCE_SERVICE_URL}/ocr/text-only`, {
+    method: 'POST',
+    body: formData
+  })
+  
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ detail: 'Unknown error' })) as InferenceServiceError
+    throw new Error(`Inference service error: ${error.detail || response.statusText}`)
+  }
+  
+  return await response.json()
+}
+
+export const ocrRoute = new Elysia({ prefix: '/api/ocr' })
+  .post('/process', async ({ body, set }) => {
     try {
       const { mangaId, pageNum, imagePath } = body as OCRRequest
       
@@ -95,6 +136,62 @@ export const ocrRoute = new Elysia({ prefix: '/api' })
       set.status = 500
       return { 
         error: 'OCR processing failed', 
+        details: error instanceof Error ? error.message : String(error)
+      }
+    }
+  })
+  
+  .post('/analyze-image', async ({ body, set }) => {
+    try {
+      const file = (body as any).file as File
+      
+      if (!file) {
+        set.status = 400
+        return { error: 'No image file provided' }
+      }
+      
+      console.log(`OCR request for uploaded image: ${file.name}`)
+      
+      // Convert File to Buffer
+      const arrayBuffer = await file.arrayBuffer()
+      const imageBuffer = Buffer.from(arrayBuffer)
+      
+      // Save to temp folder for debugging
+      const tempDir = path.join(process.cwd(), 'uploads', 'temp')
+      if (!fs.existsSync(tempDir)) {
+        fs.mkdirSync(tempDir, { recursive: true })
+      }
+      
+      const timestamp = Date.now()
+      const tempFilePath = path.join(tempDir, `ocr_debug_${timestamp}_${file.name}`)
+      fs.writeFileSync(tempFilePath, imageBuffer)
+      console.log(`Debug: Saved uploaded image to ${tempFilePath}`)
+      
+      // Send the image to the direct OCR inference service
+      const result = await callInferenceServiceDirectOCR(imageBuffer, file.name)
+      
+      if (!result.success) {
+        set.status = 500
+        return { error: result.error || 'OCR processing failed' }
+      }
+      
+      const extractedText = result.text || ''
+      
+      console.log(`Direct OCR processing completed:`)
+      console.log(`- Extracted text: "${extractedText}"`)
+      
+      return {
+        success: true,
+        text: extractedText,
+        method: 'direct_ocr',
+        debugImagePath: tempFilePath
+      }
+      
+    } catch (error) {
+      console.error('OCR image error:', error)
+      set.status = 500
+      return { 
+        error: 'OCR image processing failed', 
         details: error instanceof Error ? error.message : String(error)
       }
     }

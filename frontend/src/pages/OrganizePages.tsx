@@ -184,7 +184,7 @@ export default function OrganizePages() {
         formData.append(`pageOrder`, index.toString())
       })
 
-      const response = await fetch('/api/upload-images', {
+      const response = await fetch('/api/manga/from-images', {
         method: 'POST',
         body: formData
       })

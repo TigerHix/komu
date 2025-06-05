@@ -46,7 +46,7 @@ export default function MetadataEdit() {
 
   const fetchMetadata = async () => {
     try {
-      const response = await fetch(`/api/metadata/${id}`)
+      const response = await fetch(`/api/manga/${id}/metadata`)
       if (response.ok) {
         const data = await response.json()
         setMetadata(data)
@@ -69,7 +69,7 @@ export default function MetadataEdit() {
     })
     
     try {
-      const response = await fetch(`/api/metadata/${id}/fetch`, {
+      const response = await fetch(`/api/manga/${id}/metadata/suggestions`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -136,8 +136,8 @@ export default function MetadataEdit() {
 
     setRemovingOcr(true)
     try {
-      const response = await fetch(`/api/manga/${id}/remove-ocr`, {
-        method: 'POST'
+      const response = await fetch(`/api/manga/${id}/ocr`, {
+        method: 'DELETE'
       })
 
       if (response.ok) {
@@ -181,7 +181,7 @@ export default function MetadataEdit() {
         updateData.description = metadata.description
       }
 
-      const response = await fetch(`/api/metadata/${id}`, {
+      const response = await fetch(`/api/manga/${id}/metadata`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json'
@@ -214,7 +214,7 @@ export default function MetadataEdit() {
       const formData = new FormData()
       formData.append('file', file)
 
-      const response = await fetch(`/api/metadata/${id}/thumbnail`, {
+      const response = await fetch(`/api/manga/${id}/thumbnail`, {
         method: 'POST',
         body: formData
       })

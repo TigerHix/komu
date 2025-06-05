@@ -31,7 +31,7 @@ export function useOcrService() {
 
   const notifyPageView = useCallback(async (pageId: string) => {
     try {
-      await fetch(`/api/reader/view-page/${pageId}`, {
+      await fetch(`/api/pages/${pageId}/view`, {
         method: 'POST'
       })
     } catch (error) {
@@ -41,7 +41,7 @@ export function useOcrService() {
 
   const fetchOcrResults = useCallback(async (pageId: string): Promise<OcrPageStatus | null> => {
     try {
-      const response = await fetch(`/api/ocr/page/${pageId}/status`)
+      const response = await fetch(`/api/pages/${pageId}/ocr/status`)
       if (!response.ok) return null
 
       const status = await response.json()
@@ -52,7 +52,7 @@ export function useOcrService() {
       }))
 
       if (status.ocrStatus === 'COMPLETED') {
-        const resultsResponse = await fetch(`/api/ocr/page/${pageId}/results`)
+        const resultsResponse = await fetch(`/api/pages/${pageId}/ocr/results`)
         if (resultsResponse.ok) {
           const data = await resultsResponse.json()
           return {
@@ -132,6 +132,19 @@ export function useOcrService() {
     })
   }, [])
 
+  const resetScrollPageData = useCallback((pageNum: number) => {
+    setScrollPageData(prev => {
+      const newTextBlocks = { ...prev.textBlocks }
+      const newImageSizes = { ...prev.imageSizes }
+      delete newTextBlocks[pageNum]
+      delete newImageSizes[pageNum]
+      return {
+        textBlocks: newTextBlocks,
+        imageSizes: newImageSizes
+      }
+    })
+  }, [])
+
   const resetAllOcrData = useCallback(() => {
     resetSinglePageData()
     resetScrollData()
@@ -139,6 +152,40 @@ export function useOcrService() {
       clearTimeout(viewTimerRef.current)
     }
   }, [resetSinglePageData, resetScrollData])
+
+  // Update a specific text block in the cached data
+  const updateTextBlock = useCallback((textBlockId: string, newText: string, pageIndex?: number) => {
+    console.log('OCR Service: updateTextBlock called', { textBlockId, newText, pageIndex })
+    
+    // Update in single page mode
+    setSinglePageData(prev => {
+      const updated = {
+        ...prev,
+        textBlocks: prev.textBlocks.map(block => 
+          block.id === textBlockId ? { ...block, text: newText } : block
+        )
+      }
+      console.log('OCR Service: Updated single page data', updated.textBlocks)
+      return updated
+    })
+
+    // Update in scrolling mode if pageIndex is provided
+    if (pageIndex !== undefined) {
+      setScrollPageData(prev => {
+        const updated = {
+          ...prev,
+          textBlocks: {
+            ...prev.textBlocks,
+            [pageIndex]: (prev.textBlocks[pageIndex] || []).map(block =>
+              block.id === textBlockId ? { ...block, text: newText } : block
+            )
+          }
+        }
+        console.log('OCR Service: Updated scroll page data', updated.textBlocks[pageIndex])
+        return updated
+      })
+    }
+  }, [])
 
   return {
     // Status tracking
@@ -159,6 +206,8 @@ export function useOcrService() {
     startPageViewTracking,
     resetSinglePageData,
     resetScrollData,
+    resetScrollPageData,
     resetAllOcrData,
+    updateTextBlock,
   }
 }

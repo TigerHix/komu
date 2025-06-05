@@ -158,6 +158,41 @@ async def detect_text(file: UploadFile = File(...), original_path: Optional[str]
             os.unlink(tmp_file_path)
             print(f"DEBUG: Cleaned up temp file: {tmp_file_path}")
 
+@app.post("/ocr/text-only")
+async def extract_text_only(file: UploadFile = File(...)):
+    """
+    Extract text directly from image without text detection.
+    Useful for pre-cropped text regions where detection is not needed.
+    """
+    print(f"DEBUG: Text-only OCR endpoint called with file: {file.filename}")
+    
+    # Ensure models are initialized
+    initialize_models()
+    
+    if not file.content_type or not file.content_type.startswith('image/'):
+        raise HTTPException(status_code=400, detail="File must be an image")
+    
+    # Save uploaded file to temporary location
+    with tempfile.NamedTemporaryFile(delete=False, suffix='.jpg') as tmp_file:
+        content = await file.read()
+        tmp_file.write(content)
+        tmp_file_path = tmp_file.name
+        print(f"DEBUG: Saved uploaded file to temp path: {tmp_file_path}")
+    
+    try:
+        print(f"DEBUG: Starting direct OCR for: {tmp_file_path}")
+        result = run_direct_ocr(tmp_file_path)
+        print(f"DEBUG: Direct OCR completed successfully")
+        return result
+    except Exception as e:
+        print(f"DEBUG: Direct OCR failed with error: {e}")
+        raise HTTPException(status_code=500, detail=f"OCR processing failed: {str(e)}")
+    finally:
+        # Clean up temporary file
+        if os.path.exists(tmp_file_path):
+            os.unlink(tmp_file_path)
+            print(f"DEBUG: Cleaned up temp file: {tmp_file_path}")
+
 def calculate_tight_bbox_from_lines(blk) -> tuple:
     """
     Calculate a tighter bounding box from the individual text line polygons
@@ -188,6 +223,47 @@ def calculate_tight_bbox_from_lines(blk) -> tuple:
     y_max = np.max(all_points[:, 1])
     
     return (x_min, y_min, x_max, y_max)
+
+def run_direct_ocr(image_path: str) -> Dict[str, Any]:
+    """
+    Run OCR directly on the entire image without text detection.
+    Useful for pre-cropped text regions.
+    """
+    global manga_ocr
+    
+    try:
+        import cv2
+        from PIL import Image
+        
+        # Ensure manga-ocr is initialized
+        if manga_ocr is None:
+            raise Exception("Manga OCR not initialized. Call initialize_models() first.")
+        
+        # Load the image
+        img = cv2.imread(image_path)
+        if img is None:
+            raise Exception("Failed to load image")
+        
+        im_h, im_w = img.shape[:2]
+        
+        # Convert to PIL Image for manga-ocr
+        img_pil = Image.fromarray(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
+        
+        # Extract text using manga-ocr directly
+        extracted_text = manga_ocr(img_pil)
+        
+        print(f"DEBUG: Direct OCR extracted text: '{extracted_text}'")
+        
+        return {
+            "success": True,
+            "text": extracted_text,
+            "imageSize": {"width": int(im_w), "height": int(im_h)},
+            "method": "direct_ocr"
+        }
+        
+    except Exception as e:
+        import traceback
+        raise Exception(f"Direct OCR failed: {str(e)}\n{traceback.format_exc()}")
 
 def run_ocr_detection(image_path: str, debug_image_base_path: str = None) -> Dict[str, Any]:
     """

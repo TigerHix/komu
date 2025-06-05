@@ -51,6 +51,7 @@ export interface Manga {
 }
 
 export interface TextBlock {
+  id?: string
   bbox: [number, number, number, number]
   text: string
 }

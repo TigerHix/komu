@@ -80,7 +80,7 @@ export default function Import() {
     })
 
     try {
-      const response = await fetch('/api/upload', {
+      const response = await fetch('/api/manga/from-pdf', {
         method: 'POST',
         body: formData,
       })

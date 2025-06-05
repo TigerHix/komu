@@ -3,8 +3,8 @@ import { prisma } from '../lib/db'
 import { fetchMetadata } from '../lib/metadata-fetcher'
 import { MetadataUpdateRequest } from '../types'
 
-export const metadataRoutes = new Elysia({ prefix: '/api' })
-  .get('/metadata/:id', async ({ params }) => {
+export const metadataRoutes = new Elysia({ prefix: '/api/manga' })
+  .get('/:id/metadata', async ({ params }) => {
     const manga = await prisma.manga.findUnique({
       where: { id: params.id },
       select: {
@@ -25,7 +25,7 @@ export const metadataRoutes = new Elysia({ prefix: '/api' })
     return manga
   })
   
-  .post('/metadata/:id/fetch', async ({ params, body }) => {
+  .post('/:id/metadata/suggestions', async ({ params, body }) => {
     console.log('🚀 /metadata/:id/fetch route called with id:', params.id)
     
     // Use form data if provided, otherwise fall back to database values
@@ -80,7 +80,7 @@ export const metadataRoutes = new Elysia({ prefix: '/api' })
     }))
   })
   
-  .put('/metadata/:id', async ({ params, body }) => {
+  .put('/:id/metadata', async ({ params, body }) => {
     const updateData = body as MetadataUpdateRequest
     
     const manga = await prisma.manga.update({
@@ -108,7 +108,7 @@ export const metadataRoutes = new Elysia({ prefix: '/api' })
     })
   })
   
-  .post('/metadata/:id/thumbnail', async ({ params, body }) => {
+  .post('/:id/thumbnail', async ({ params, body }) => {
     const { file } = body as { file: File }
     
     if (!file || !file.type.startsWith('image/')) {
