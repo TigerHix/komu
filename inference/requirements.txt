@@ -20,10 +20,15 @@ pyclipper
 shapely
 
 # OCR dependencies
-manga-ocr>=0.1.10
+manga-ocr
 
 # comic-text-detector dependencies
 wandb
+opencv-python
+torch-summary
+tqdm
+pyclipper
+shapely
 
 # Development dependencies (optional)
 pytest>=7.0.0
