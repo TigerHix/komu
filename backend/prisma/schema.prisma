@@ -1,6 +1,10 @@
 generator client {
   provider = "prisma-client-js"
+<<<<<<< HEAD
   binaryTargets = ["debian-openssl-3.0.x"]
+=======
+  binaryTargets = [ "native", "debian-openssl-1.1.x", "debian-openssl-3.0.x" ]
+>>>>>>> 681644f (fix)
 }
 
 datasource db {
