@@ -10,13 +10,14 @@
 
 <div align="center">
   
-<img src="screenshots/0.png" alt="Library View" width="300" style="margin: 10px; border-radius: 12px;">
-<img src="screenshots/1.png" alt="Upload Interface" width="300" style="margin: 10px; border-radius: 12px;">
-<img src="screenshots/2.png" alt="Reading Mode" width="300" style="margin: 10px; border-radius: 12px;">
-<img src="screenshots/3.png" alt="Text Overlay" width="300" style="margin: 10px; border-radius: 12px;">
-<img src="screenshots/4.png" alt="Grammar Breakdown" width="300" style="margin: 10px; border-radius: 12px;">
-<img src="screenshots/5.png" alt="Text Analysis" width="300" style="margin: 10px; border-radius: 12px;">
-<img src="screenshots/6.png" alt="Settings Page" width="300" style="margin: 10px; border-radius: 12px;">
+<img src="screenshots/desktop1.png" alt="Library View" width="800" style="margin: 10px; border-radius: 12px;">
+<img src="screenshots/mobile1.png" alt="Upload Interface" width="300" style="margin: 10px; border-radius: 12px;">
+<img src="screenshots/mobile2.png" alt="Reading Mode" width="300" style="margin: 10px; border-radius: 12px;">
+<img src="screenshots/mobile3.png" alt="Text Overlay" width="300" style="margin: 10px; border-radius: 12px;">
+<img src="screenshots/mobile4.png" alt="Grammar Breakdown" width="300" style="margin: 10px; border-radius: 12px;">
+<img src="screenshots/mobile5.png" alt="Text Analysis" width="300" style="margin: 10px; border-radius: 12px;">
+<img src="screenshots/mobile6.png" alt="Settings Page" width="300" style="margin: 10px; border-radius: 12px;">
+<img src="screenshots/mobile7.png" alt="Settings Page" width="300" style="margin: 10px; border-radius: 12px;">
 
 </div>
 
