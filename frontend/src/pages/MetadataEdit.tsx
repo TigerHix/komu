@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { useToast } from '@/components/ui/use-toast'
 import { Loader2, Upload, Check, X, Sparkles, Trash2, ChevronLeft, User, FileText, Image as ImageIcon, Bot } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 
 interface Metadata {
   id: string
@@ -29,6 +30,7 @@ export default function MetadataEdit() {
   const { id } = useParams()
   const navigate = useNavigate()
   const { toast } = useToast()
+  const { t } = useTranslation()
   
   const [metadata, setMetadata] = useState<Metadata | null>(null)
   const [loading, setLoading] = useState(true)
@@ -64,8 +66,8 @@ export default function MetadataEdit() {
     setFetchingSuggestions(true)
     
     toast({
-      title: 'Fetching metadata...',
-      description: 'AI is searching the internet for manga information'
+      title: t('notifications.metadata.fetching'),
+      description: t('notifications.metadata.fetchingDesc')
     })
     
     try {
@@ -86,21 +88,21 @@ export default function MetadataEdit() {
           setSuggestions(data)
           setShowSuggestions(true)
           toast({
-            title: 'Metadata suggestions available',
-            description: 'AI-powered suggestions are ready for review'
+            title: t('notifications.metadata.suggestionsAvailable'),
+            description: t('notifications.metadata.suggestionsAvailableDesc')
           })
         } else {
           toast({
-            title: 'No suggestions found',
-            description: 'AI could not find reliable metadata for this manga'
+            title: t('notifications.metadata.noSuggestions'),
+            description: t('notifications.metadata.noSuggestionsDesc')
           })
         }
       }
     } catch (error) {
       console.error('Error fetching suggestions:', error)
       toast({
-        title: 'Failed to fetch suggestions',
-        description: 'There was an error fetching AI suggestions',
+        title: t('notifications.metadata.fetchFailed'),
+        description: t('notifications.metadata.fetchFailedDesc'),
         variant: 'destructive'
       })
     } finally {
@@ -117,8 +119,8 @@ export default function MetadataEdit() {
       })
       setShowSuggestions(false)
       toast({
-        title: 'Suggestions applied',
-        description: 'Metadata has been updated with AI suggestions'
+        title: t('notifications.metadata.suggestionsApplied'),
+        description: t('notifications.metadata.suggestionsAppliedDesc')
       })
     }
   }
@@ -131,7 +133,7 @@ export default function MetadataEdit() {
   const handleRemoveOcr = async () => {
     if (!id) return
 
-    const confirmed = confirm('Remove all OCR data for this manga? Pages will be re-processed automatically.')
+    const confirmed = confirm(t('metadata.removeOcrConfirm'))
     if (!confirmed) return
 
     setRemovingOcr(true)
@@ -143,7 +145,7 @@ export default function MetadataEdit() {
       if (response.ok) {
         const data = await response.json()
         toast({
-          title: 'OCR data removed',
+          title: t('notifications.metadata.ocrRemoved'),
           description: data.message
         })
       } else {
@@ -152,8 +154,8 @@ export default function MetadataEdit() {
     } catch (error) {
       console.error('Error removing OCR data:', error)
       toast({
-        title: 'Failed to remove OCR data',
-        description: 'There was an error removing the OCR data',
+        title: t('notifications.metadata.ocrRemoveFailed'),
+        description: t('notifications.metadata.ocrRemoveFailedDesc'),
         variant: 'destructive'
       })
     } finally {
@@ -191,8 +193,8 @@ export default function MetadataEdit() {
 
       if (response.ok) {
         toast({
-          title: 'Metadata saved',
-          description: 'Your changes have been saved successfully'
+          title: t('notifications.metadata.saved'),
+          description: t('notifications.metadata.savedDesc')
         })
         navigate('/')
       } else {
@@ -200,8 +202,8 @@ export default function MetadataEdit() {
       }
     } catch (error) {
       toast({
-        title: 'Save failed',
-        description: 'There was an error saving your changes',
+        title: t('notifications.metadata.saveFailed'),
+        description: t('notifications.metadata.saveFailedDesc'),
         variant: 'destructive'
       })
     } finally {
@@ -223,14 +225,14 @@ export default function MetadataEdit() {
         const data = await response.json()
         setMetadata(prev => prev ? { ...prev, thumbnail: data.thumbnail } : null)
         toast({
-          title: 'Thumbnail updated',
-          description: 'New thumbnail has been uploaded'
+          title: t('notifications.metadata.thumbnailUpdated'),
+          description: t('notifications.metadata.thumbnailUpdatedDesc')
         })
       }
     } catch (error) {
       toast({
-        title: 'Upload failed',
-        description: 'Failed to upload thumbnail',
+        title: t('notifications.metadata.uploadFailed'),
+        description: t('notifications.metadata.uploadFailedDesc'),
         variant: 'destructive'
       })
     }
@@ -268,11 +270,11 @@ export default function MetadataEdit() {
             className="mb-4 -ml-2 apple-body text-text-secondary hover:text-text-primary"
           >
             <ChevronLeft className="h-4 w-4 mr-1" />
-            Back to Library
+            {t('metadata.backToLibrary')}
           </Button>
-          <h1 className="apple-title-2 text-text-primary font-bold mb-2">Edit Metadata</h1>
+          <h1 className="apple-title-2 text-text-primary font-bold mb-2">{t('metadata.title')}</h1>
           <p className="apple-body text-text-secondary">
-            Update information about your manga
+            {t('metadata.subtitle')}
           </p>
         </motion.div>
 
@@ -290,8 +292,8 @@ export default function MetadataEdit() {
                     <ImageIcon className="h-5 w-5 text-accent" />
                   </div>
                   <div>
-                    <CardTitle>Cover & Basic Information</CardTitle>
-                    <CardDescription>Thumbnail and core manga details</CardDescription>
+                    <CardTitle>{t('metadata.cover')}</CardTitle>
+                    <CardDescription>{t('metadata.coverDescription')}</CardDescription>
                   </div>
                 </div>
               </CardHeader>
@@ -322,7 +324,7 @@ export default function MetadataEdit() {
                       >
                         <div className="flex items-center justify-center space-x-2">
                           <Upload className="h-4 w-4" />
-                          <span>Change Cover</span>
+                          <span>{t('metadata.changeCover')}</span>
                         </div>
                       </Button>
                       <input
@@ -342,20 +344,21 @@ export default function MetadataEdit() {
                   <div className="flex-1 space-y-4">
                     <div>
                       <Label htmlFor="title" className="apple-callout font-medium text-text-primary mb-2 block">
-                        Title
+                        {t('metadata.fields.title')}
                       </Label>
                       <Input
                         id="title"
                         value={metadata.title}
                         onChange={(e) => setMetadata({ ...metadata, title: e.target.value })}
                         className="apple-body bg-surface-2 border-border/50 focus:border-accent text-text-primary"
+                        lang="ja"
                       />
                     </div>
 
                     <div className="grid grid-cols-2 gap-4">
                       <div>
                         <Label htmlFor="type" className="apple-callout font-medium text-text-primary mb-2 block">
-                          Type
+                          {t('metadata.fields.type')}
                         </Label>
                         <Select 
                           value={metadata.type} 
@@ -367,15 +370,15 @@ export default function MetadataEdit() {
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="Volume">Volume</SelectItem>
-                            <SelectItem value="Chapter">Chapter</SelectItem>
+                            <SelectItem value="Volume">{t('metadata.types.volumeLabel')}</SelectItem>
+                            <SelectItem value="Chapter">{t('metadata.types.chapterLabel')}</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
 
                       <div>
                         <Label htmlFor="number" className="apple-callout font-medium text-text-primary mb-2 block">
-                          Number
+                          {t('metadata.fields.number')}
                         </Label>
                         <Input
                           id="number"
@@ -408,22 +411,23 @@ export default function MetadataEdit() {
                     <User className="h-5 w-5 text-accent" />
                   </div>
                   <div>
-                    <CardTitle>Author Information</CardTitle>
-                    <CardDescription>Creator and attribution details</CardDescription>
+                    <CardTitle>{t('metadata.authorInfo')}</CardTitle>
+                    <CardDescription>{t('metadata.authorDescription')}</CardDescription>
                   </div>
                 </div>
               </CardHeader>
               <CardContent>
                 <div>
                   <Label htmlFor="author" className="apple-callout font-medium text-text-primary mb-2 block">
-                    Author
+                    {t('metadata.fields.author')}
                   </Label>
                   <Input
                     id="author"
                     value={metadata.author || ''}
                     onChange={(e) => setMetadata({ ...metadata, author: e.target.value })}
-                    placeholder="Enter author name"
+                    placeholder={t('metadata.authorPlaceholder')}
                     className="apple-body bg-surface-2 border-border/50 focus:border-accent text-text-primary placeholder:text-text-tertiary"
+                    lang="ja"
                   />
                 </div>
               </CardContent>
@@ -443,23 +447,24 @@ export default function MetadataEdit() {
                     <FileText className="h-5 w-5 text-accent" />
                   </div>
                   <div>
-                    <CardTitle>Description</CardTitle>
-                    <CardDescription>Summary and synopsis</CardDescription>
+                    <CardTitle>{t('metadata.descriptionSection')}</CardTitle>
+                    <CardDescription>{t('metadata.descriptionSubtitle')}</CardDescription>
                   </div>
                 </div>
               </CardHeader>
               <CardContent>
                 <div>
                   <Label htmlFor="description" className="apple-callout font-medium text-text-primary mb-2 block">
-                    Synopsis
+                    {t('metadata.synopsis')}
                   </Label>
                   <Textarea
                     id="description"
                     value={metadata.description || ''}
                     onChange={(e) => setMetadata({ ...metadata, description: e.target.value })}
-                    placeholder="Enter description or synopsis"
+                    placeholder={t('metadata.synopsisPlaceholder')}
                     rows={4}
                     className="apple-body bg-surface-2 border-border/50 focus:border-accent text-text-primary placeholder:text-text-tertiary resize-none"
+                    lang="ja"
                   />
                 </div>
               </CardContent>
@@ -479,8 +484,8 @@ export default function MetadataEdit() {
                     <Bot className="h-5 w-5 text-accent" />
                   </div>
                   <div>
-                    <CardTitle>AI Assistant</CardTitle>
-                    <CardDescription>Get metadata suggestions from the web</CardDescription>
+                    <CardTitle>{t('metadata.aiAssistant')}</CardTitle>
+                    <CardDescription>{t('metadata.aiDescription')}</CardDescription>
                   </div>
                 </div>
               </CardHeader>
@@ -498,17 +503,17 @@ export default function MetadataEdit() {
                         transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
                         className="h-4 w-4 border-2 border-current border-t-transparent rounded-full mr-2"
                       />
-                      Searching...
+                      {t('metadata.searching')}
                     </>
                   ) : (
                     <>
                       <Sparkles className="h-4 w-4 mr-2" />
-                      Fetch from Web
+                      {t('metadata.fetchFromWeb')}
                     </>
                   )}
                 </Button>
                 <p className="apple-caption-1 text-text-secondary mt-2">
-                  AI will search the web and suggest metadata for the fields above
+                  {t('metadata.aiSuggestionNote')}
                 </p>
               </CardContent>
             </Card>
@@ -526,17 +531,17 @@ export default function MetadataEdit() {
                 <div className="flex-1">
                   <h3 className="apple-callout font-semibold text-text-primary mb-3 flex items-center">
                     <Sparkles className="h-4 w-4 mr-2 text-accent" />
-                    AI Suggestions Available
+                    {t('metadata.suggestionsAvailable')}
                   </h3>
                   <div className="space-y-3 apple-footnote text-text-secondary">
                     {suggestions.author && (
                       <div className="bg-surface-1 rounded-xl p-3">
-                        <span className="font-medium text-text-primary">Author:</span> {suggestions.author}
+                        <span className="font-medium text-text-primary">{t('metadata.fields.author')}:</span> <span lang="ja">{suggestions.author}</span>
                       </div>
                     )}
                     {suggestions.description && (
                       <div className="bg-surface-1 rounded-xl p-3">
-                        <span className="font-medium text-text-primary">Description:</span> {suggestions.description}
+                        <span className="font-medium text-text-primary">{t('metadata.fields.description')}:</span> <span lang="ja">{suggestions.description}</span>
                       </div>
                     )}
                   </div>
@@ -544,11 +549,11 @@ export default function MetadataEdit() {
                 <div className="flex space-x-2 ml-4">
                   <Button size="sm" onClick={applySuggestions} className="bg-accent hover:bg-accent/90 text-accent-foreground">
                     <Check className="h-4 w-4 mr-1" />
-                    Apply
+                    {t('metadata.apply')}
                   </Button>
                   <Button size="sm" variant="outline" onClick={dismissSuggestions} className="border-border/50">
                     <X className="h-4 w-4 mr-1" />
-                    Dismiss
+                    {t('metadata.dismiss')}
                   </Button>
                 </div>
               </div>
@@ -574,10 +579,10 @@ export default function MetadataEdit() {
                     transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
                     className="h-4 w-4 border-2 border-current border-t-transparent rounded-full mr-2"
                   />
-                  Saving...
+                  {t('metadata.saving')}
                 </>
               ) : (
-                "Save Changes"
+                t('metadata.saveChanges')
               )}
             </Button>
             
@@ -595,12 +600,12 @@ export default function MetadataEdit() {
                       transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
                       className="h-4 w-4 border-2 border-current border-t-transparent rounded-full mr-2"
                     />
-                    Removing...
+                    {t('metadata.removing')}
                   </>
                 ) : (
                   <>
                     <Trash2 className="h-4 w-4 mr-2" />
-                    Remove OCR Data
+                    {t('metadata.removeOcrData')}
                   </>
                 )}
               </Button>
@@ -610,7 +615,7 @@ export default function MetadataEdit() {
                 onClick={() => navigate('/')}
                 className="flex-1 apple-body font-medium border-border/50 hover:border-border"
               >
-                Cancel
+                {t('common.cancel')}
               </Button>
             </div>
           </motion.div>

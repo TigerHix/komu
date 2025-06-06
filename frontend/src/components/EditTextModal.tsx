@@ -1,6 +1,6 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { Check, Camera } from 'lucide-react'
+import { Check, Camera, Brain } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
 interface EditContext {
@@ -22,6 +22,7 @@ export function EditTextModal({ isOpen, editContext, onSave, onCancel }: EditTex
   const [editedText, setEditedText] = useState('')
   const [isSaving, setIsSaving] = useState(false)
   const [isPerformingOcr, setIsPerformingOcr] = useState(false)
+  const [isPerformingVlmOcr, setIsPerformingVlmOcr] = useState(false)
   const [croppedImageUrl, setCroppedImageUrl] = useState<string | null>(null)
   
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -177,6 +178,81 @@ export function EditTextModal({ isOpen, editContext, onSave, onCancel }: EditTex
     }
   }, [editContext])
 
+  const handlePerformVlmOcr = useCallback(async () => {
+    if (!editContext?.selectedBlock || !editContext?.imagePath || !editContext?.imageSize) {
+      console.error('Missing context for VLM OCR')
+      return
+    }
+
+    setIsPerformingVlmOcr(true)
+    try {
+      const img = new Image()
+      img.crossOrigin = 'anonymous'
+      
+      await new Promise<void>((resolve, reject) => {
+        img.onload = () => resolve()
+        img.onerror = reject
+        img.src = editContext.imagePath!.startsWith('/') ? editContext.imagePath! : `/${editContext.imagePath!}`
+      })
+
+      const canvas = document.createElement('canvas')
+      const ctx = canvas.getContext('2d')
+      if (!ctx) {
+        console.error('Failed to get canvas context')
+        return
+      }
+
+      // Calculate crop dimensions with padding
+      const padding = 10
+      const [x1, y1, x2, y2] = editContext.selectedBlock.bbox
+      const cropX = Math.max(0, x1 - padding)
+      const cropY = Math.max(0, y1 - padding)
+      const cropWidth = Math.min(editContext.imageSize!.width - cropX, (x2 - x1) + (padding * 2))
+      const cropHeight = Math.min(editContext.imageSize!.height - cropY, (y2 - y1) + (padding * 2))
+
+      canvas.width = cropWidth
+      canvas.height = cropHeight
+
+      ctx.drawImage(
+        img,
+        cropX, cropY, cropWidth, cropHeight,
+        0, 0, cropWidth, cropHeight
+      )
+
+      const blob = await new Promise<Blob>((resolve) => {
+        canvas.toBlob((blob) => {
+          resolve(blob!)
+        }, 'image/jpeg', 0.9)
+      })
+
+      const formData = new FormData()
+      formData.append('file', blob, 'cropped_text.jpg')
+
+      const response = await fetch('/api/ocr/analyze-image-vlm', {
+        method: 'POST',
+        body: formData
+      })
+
+      if (response.ok) {
+        const result = await response.json()
+        if (result.text) {
+          setEditedText(result.text.trim())
+          if (navigator.vibrate) {
+            navigator.vibrate(50)
+          }
+        }
+      } else {
+        console.error('VLM OCR request failed:', response.status)
+        const errorData = await response.json().catch(() => ({}))
+        console.error('VLM OCR error details:', errorData)
+      }
+    } catch (error) {
+      console.error('Error performing VLM OCR:', error)
+    } finally {
+      setIsPerformingVlmOcr(false)
+    }
+  }, [editContext])
+
   const handleSave = useCallback(async () => {
     if (!editedText.trim()) return
     
@@ -267,31 +343,58 @@ export function EditTextModal({ isOpen, editContext, onSave, onCancel }: EditTex
                   )}
                 </div>
                 
-                {/* OCR Button */}
-                <motion.div
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                  className="mt-3"
-                >
-                  <Button
-                    onClick={handlePerformOcr}
-                    disabled={isPerformingOcr || isSaving}
-                    variant="ghost"
-                    className="w-full apple-callout font-medium border border-border hover:bg-surface-2"
+                {/* OCR Buttons */}
+                <div className="mt-3 flex gap-3">
+                  <motion.div
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    className="flex-1"
                   >
-                    {isPerformingOcr ? (
-                      <>
-                        <div className="animate-spin h-4 w-4 border-2 border-current border-t-transparent rounded-full mr-2" />
-                        Performing OCR...
-                      </>
-                    ) : (
-                      <>
-                        <Camera className="h-4 w-4 mr-2" />
-                        Perform OCR
-                      </>
-                    )}
-                  </Button>
-                </motion.div>
+                    <Button
+                      onClick={handlePerformOcr}
+                      disabled={isPerformingOcr || isPerformingVlmOcr || isSaving}
+                      variant="ghost"
+                      className="w-full apple-callout font-medium border border-border hover:bg-surface-2"
+                    >
+                      {isPerformingOcr ? (
+                        <>
+                          <div className="animate-spin h-4 w-4 border-2 border-current border-t-transparent rounded-full mr-2" />
+                          Local OCR...
+                        </>
+                      ) : (
+                        <>
+                          <Camera className="h-4 w-4 mr-2" />
+                          Local OCR
+                        </>
+                      )}
+                    </Button>
+                  </motion.div>
+                  
+                  <motion.div
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    className="flex-1"
+                  >
+                    <Button
+                      onClick={handlePerformVlmOcr}
+                      disabled={isPerformingOcr || isPerformingVlmOcr || isSaving}
+                      variant="ghost"
+                      className="w-full apple-callout font-medium border border-accent/30 hover:bg-accent/5 text-accent"
+                    >
+                      {isPerformingVlmOcr ? (
+                        <>
+                          <div className="animate-spin h-4 w-4 border-2 border-current border-t-transparent rounded-full mr-2" />
+                          VLM OCR...
+                        </>
+                      ) : (
+                        <>
+                          <Brain className="h-4 w-4 mr-2" />
+                          VLM OCR
+                        </>
+                      )}
+                    </Button>
+                  </motion.div>
+                </div>
               </div>
               
               {/* Text Section */}
@@ -304,7 +407,7 @@ export function EditTextModal({ isOpen, editContext, onSave, onCancel }: EditTex
                   className="w-full p-4 bg-surface-2 border border-border rounded-xl text-text-primary apple-body resize-none focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent transition-all duration-200 select-text"
                   rows={3}
                   placeholder="Enter the text..."
-                  disabled={isSaving || isPerformingOcr}
+                  disabled={isSaving || isPerformingOcr || isPerformingVlmOcr}
                   style={{ 
                     minHeight: '100px'
                   }}
@@ -317,7 +420,7 @@ export function EditTextModal({ isOpen, editContext, onSave, onCancel }: EditTex
                 transition={{ delay: 0.25, duration: 0.3 }}
                 className="text-xs text-text-tertiary bg-accent/5 border border-accent/20 rounded-lg p-3 select-text"
               >
-                💡 Tip: Correct any OCR errors to improve grammar analysis accuracy
+                💡 Tip: Try both Local OCR (fast) and VLM OCR (AI-powered) for best results
               </motion.div>
             </motion.div>
             
@@ -336,7 +439,7 @@ export function EditTextModal({ isOpen, editContext, onSave, onCancel }: EditTex
                 <Button
                   variant="ghost"
                   onClick={handleCancel}
-                  disabled={isSaving || isPerformingOcr}
+                  disabled={isSaving || isPerformingOcr || isPerformingVlmOcr}
                   className="w-full apple-callout font-medium"
                 >
                   Cancel
@@ -349,7 +452,7 @@ export function EditTextModal({ isOpen, editContext, onSave, onCancel }: EditTex
               >
                 <Button
                   onClick={handleSave}
-                  disabled={isSaving || isPerformingOcr || editedText.trim() === ''}
+                  disabled={isSaving || isPerformingOcr || isPerformingVlmOcr || editedText.trim() === ''}
                   className="w-full bg-accent hover:bg-accent/90 text-white apple-callout font-medium"
                 >
                   {isSaving ? (

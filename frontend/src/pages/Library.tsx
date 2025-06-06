@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useLocation } from 'react-router-dom'
+
 import { motion, AnimatePresence } from 'framer-motion'
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
@@ -7,6 +8,7 @@ import { OcrStatusBlock } from '@/components/OcrStatusBlock'
 import { MangaCoverTransition } from '@/components/PageTransition'
 import { useToast } from '@/components/ui/use-toast'
 import { Plus, Book, Edit, Trash2, TestTube } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 
 interface MangaItem {
   id: string
@@ -45,17 +47,18 @@ export default function Library() {
   const [longPressTimeout, setLongPressTimeout] = useState<number | null>(null)
   const [buttonContainerHeight, setButtonContainerHeight] = useState(100)
   const [touchStartPos, setTouchStartPos] = useState<{ x: number; y: number } | null>(null)
+  const [maxMovement, setMaxMovement] = useState<{ [key: string]: number }>({})
   const buttonContainerRef = useRef<HTMLDivElement>(null)
   const { toast } = useToast()
   const navigate = useNavigate()
+  const location = useLocation()
+  const { t } = useTranslation()
 
   useEffect(() => {
     fetchManga()
     fetchOcrCompletionStatus()
-    
-    // Reset scroll position when navigating to library
-    window.scrollTo(0, 0)
   }, [])
+
 
   // Dismiss long press mode when clicking outside
   useEffect(() => {
@@ -147,7 +150,7 @@ export default function Library() {
   }
 
   const deleteManga = async (id: string, title: string) => {
-    if (!confirm(`Are you sure you want to delete "${title}"? This action cannot be undone.`)) {
+    if (!confirm(t('notifications.library.deleteConfirm', { title }))) {
       return
     }
 
@@ -159,11 +162,11 @@ export default function Library() {
       if (response.ok) {
         setManga(prev => prev.filter(item => item.id !== id))
       } else {
-        alert('Failed to delete manga. Please try again.')
+        alert(t('notifications.library.deleteFailed'))
       }
     } catch (error) {
       console.error('Error deleting manga:', error)
-      alert('Failed to delete manga. Please try again.')
+      alert(t('notifications.library.deleteFailed'))
     }
   }
 
@@ -176,22 +179,17 @@ export default function Library() {
   }
 
   return (
-    <motion.div 
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      transition={{ duration: 0.3, ease: [0.25, 0.46, 0.45, 0.94] }}
-      className="min-h-screen bg-background pb-20"
-    >
+    <div className="min-h-screen bg-background pb-20">
       <div className="max-w-6xl mx-auto px-6 py-8">
         <div className="mb-8">
           <motion.h1 
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, ease: "easeOut" }}
-            className="apple-title-2 font-bold tracking-wider text-accent"
+            className="font-bold tracking-wider text-accent"
             style={{
               fontSize: '2.5rem',
-              letterSpacing: '0.15em',
+              letterSpacing: '0em',
               fontWeight: '800'
             }}
           >
@@ -230,7 +228,7 @@ export default function Library() {
                 transition={{ delay: 0.3 }}
                 className="apple-title-3 text-text-primary mb-3"
               >
-                No manga yet
+                {t('library.empty.title')}
               </motion.h3>
               <motion.p 
                 initial={{ opacity: 0 }}
@@ -238,7 +236,7 @@ export default function Library() {
                 transition={{ delay: 0.4 }}
                 className="apple-body text-text-secondary mb-8 max-w-md mx-auto"
               >
-                Start building your library by uploading your first manga
+                {t('library.empty.description')}
               </motion.p>
               <motion.div
                 initial={{ opacity: 0, y: 10 }}
@@ -248,7 +246,7 @@ export default function Library() {
                 <Link to="/import">
                   <Button className="apple-callout font-medium bg-accent hover:bg-accent/90 text-accent-foreground px-6 py-3 shadow-sm">
                     <Plus className="h-4 w-4 mr-2" />
-                    Upload First Manga
+                    {t('library.empty.uploadButton')}
                   </Button>
                 </Link>
               </motion.div>
@@ -285,6 +283,9 @@ export default function Library() {
                       setTouchStartPos(startPos)
                       setIsPressing(item.id)
                       
+                      // Reset movement tracking for this card
+                      setMaxMovement(prev => ({ ...prev, [item.id]: 0 }))
+                      
                       // iOS-compatible long press implementation
                       const timeoutId = setTimeout(() => {
                         setIsPressing(null)
@@ -300,15 +301,21 @@ export default function Library() {
                       setLongPressTimeout(timeoutId)
                     }}
                     onTouchMove={(e) => {
-                      // Cancel long press if user starts scrolling
-                      if (touchStartPos && longPressTimeout) {
+                      // Track cumulative movement for this touch sequence
+                      if (touchStartPos) {
                         const touch = e.touches[0]
                         const deltaX = Math.abs(touch.clientX - touchStartPos.x)
                         const deltaY = Math.abs(touch.clientY - touchStartPos.y)
                         const movement = Math.sqrt(deltaX * deltaX + deltaY * deltaY)
                         
-                        // If movement is more than 10px, cancel long press
-                        if (movement > 10) {
+                        // Update maximum movement seen for this card
+                        setMaxMovement(prev => ({
+                          ...prev,
+                          [item.id]: Math.max(prev[item.id] || 0, movement)
+                        }))
+                        
+                        // Cancel long press if movement exceeds threshold
+                        if (movement > 10 && longPressTimeout) {
                           clearTimeout(longPressTimeout)
                           setLongPressTimeout(null)
                           setIsPressing(null)
@@ -325,22 +332,16 @@ export default function Library() {
                       // If long press is active, don't dismiss it - let outside click handle that
                       if (longPressCard === item.id) {
                         setIsPressing(null)
+                        setTouchStartPos(null)
                         return
                       }
                       
-                      // Check if this was a scroll gesture by measuring movement
-                      if (touchStartPos && e.changedTouches[0]) {
-                        const touch = e.changedTouches[0]
-                        const deltaX = Math.abs(touch.clientX - touchStartPos.x)
-                        const deltaY = Math.abs(touch.clientY - touchStartPos.y)
-                        const movement = Math.sqrt(deltaX * deltaX + deltaY * deltaY)
-                        
-                        // If movement is more than 10px, treat as scroll and don't navigate
-                        if (movement > 10) {
-                          setIsPressing(null)
-                          setTouchStartPos(null)
-                          return
-                        }
+                      // Check if there was significant movement during the touch sequence
+                      const cardMaxMovement = maxMovement[item.id] || 0
+                      if (cardMaxMovement > 15) { // 15px threshold
+                        setIsPressing(null)
+                        setTouchStartPos(null)
+                        return
                       }
                       
                       setIsPressing(null)
@@ -383,11 +384,21 @@ export default function Library() {
                       setTouchStartPos(null)
                     }}
                     // Fallback for desktop - keep framer-motion handlers
-                    onTapStart={() => setIsPressing(item.id)}
+                    onTapStart={() => {
+                      setIsPressing(item.id)
+                      // Reset movement tracking for this card (desktop fallback)
+                      setMaxMovement(prev => ({ ...prev, [item.id]: 0 }))
+                    }}
                     onTap={() => {
                       setIsPressing(null)
                       // Don't open manga if in long press mode - let outside click handle dismissal
                       if (longPressCard === item.id) {
+                        return
+                      }
+                      
+                      // Check movement threshold (same as touch handlers)
+                      const cardMaxMovement = maxMovement[item.id] || 0
+                      if (cardMaxMovement > 15) {
                         return
                       }
                       
@@ -473,15 +484,15 @@ export default function Library() {
                     
                       {/* Title and info area */}
                       <div className="p-4">
-                        <h3 className="apple-callout font-semibold text-text-primary mb-2 line-clamp-2 leading-tight">
+                        <h3 className="apple-callout font-semibold text-text-primary mb-2 line-clamp-2 leading-tight" lang="ja">
                           {item.title}
                         </h3>
                         <div className="space-y-1 mb-3">
                           <div className="apple-caption-1 text-text-secondary">
-                            {item.number ? `${item.type} ${item.number}` : `Unknown ${item.type}`}
+                            {item.number ? t(`metadata.types.${item.type.toLowerCase()}`, { number: item.number }) : `Unknown ${item.type}`}
                           </div>
-                          <div className="apple-caption-1 text-text-tertiary line-clamp-1">
-                            {item.author || 'Unknown Author'}
+                          <div className="apple-caption-1 text-text-tertiary line-clamp-1" lang="ja">
+                            {item.author || t('library.unknownAuthor')}
                           </div>
                         </div>
                         {item.totalPages > 0 && (
@@ -489,8 +500,8 @@ export default function Library() {
                             <div className="flex justify-between">
                               <span className="apple-caption-2 text-text-secondary">
                                 {item.progressPercent === 0 
-                                  ? `${item.totalPages} pages` 
-                                  : `Page ${item.currentPage + 1} of ${item.totalPages}`
+                                  ? t('library.totalPages', { total: item.totalPages })
+                                  : t('library.currentProgress', { current: item.currentPage + 1, total: item.totalPages })
                                 }
                               </span>
                               <span className="apple-caption-2 font-medium text-text-primary">
@@ -533,7 +544,7 @@ export default function Library() {
                               className="w-full apple-body font-medium border-border/50 hover:border-border justify-center"
                             >
                               <Edit className="h-4 w-4 mr-2" />
-                              Edit Metadata
+                              {t('library.editMetadata')}
                             </Button>
                           </motion.div>
                         </Link>
@@ -551,7 +562,7 @@ export default function Library() {
                             }}
                           >
                             <Trash2 className="h-4 w-4 mr-2" />
-                            Delete Manga
+                            {t('library.deleteManga')}
                           </Button>
                         </motion.div>
                       </div>
@@ -599,7 +610,6 @@ export default function Library() {
         </AnimatePresence>
       </div>
       
-      {/* Manga Cover Transition */}
       <MangaCoverTransition
         coverImage={selectedCover}
         isOpen={showCoverTransition}
@@ -610,9 +620,34 @@ export default function Library() {
             setPendingNavigation(null)
           }
           setSelectedCover(undefined)
-          setHideBottomTabs(false) // Reset bottom tabs state
         }}
       />
-    </motion.div>
+    </div>
   )
+
+  const handleCardTap = (item: MangaItem) => {
+    if (isAnimatingCard) return
+    
+    setIsPressing(null)
+    setTouchData(null)
+    setIsAnimatingCard(item.id)
+    setAnimationPhase('overshoot')
+    
+    setTimeout(() => {
+      setAnimationPhase('idle')
+      
+      setTimeout(() => {
+        if (item.thumbnail) {
+          setSelectedCover(item.thumbnail)
+          setPendingNavigation(`/reader/${item.id}`)
+          setShowCoverTransition(true)
+        } else {
+          navigate(`/reader/${item.id}`)
+        }
+        
+        setIsAnimatingCard(null)
+        setAnimationPhase('idle')
+      }, 150)
+    }, 150)
+  }
 }

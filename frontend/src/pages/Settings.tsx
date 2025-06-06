@@ -1,11 +1,36 @@
 import { motion } from 'framer-motion'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Toggle } from '@/components/ui/toggle'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useDarkMode } from '@/hooks/useDarkMode'
-import { Moon, Sun, Palette } from 'lucide-react'
+import { Moon, Sun, Palette, Languages } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
+import { useEffect, useState } from 'react'
+import KomiEasterEgg from '@/components/KomiEasterEgg'
 
 export default function Settings() {
   const { isDarkMode, toggleDarkMode } = useDarkMode()
+  const { t, i18n } = useTranslation()
+  const [currentLanguage, setCurrentLanguage] = useState(i18n.language || 'en')
+  const [showKomiEasterEgg, setShowKomiEasterEgg] = useState(false)
+
+  useEffect(() => {
+    const updateLanguage = () => setCurrentLanguage(i18n.language || 'en')
+    i18n.on('languageChanged', updateLanguage)
+    updateLanguage()
+    return () => i18n.off('languageChanged', updateLanguage)
+  }, [i18n])
+
+  const getLanguageDisplayName = (lang: string) => 
+    lang === 'zh' ? t('settings.language.chinese') : t('settings.language.english')
+
+  const handleIconClick = () => {
+    setShowKomiEasterEgg(true)
+  }
+
+  const handleEasterEggClose = () => {
+    setShowKomiEasterEgg(false)
+  }
 
   return (
     <motion.div 
@@ -20,9 +45,9 @@ export default function Settings() {
           animate={{ opacity: 1, y: 0 }}
           className="text-center mb-8"
         >
-          <h1 className="apple-title-2 text-text-primary font-bold mb-2">Settings</h1>
+          <h1 className="apple-title-2 text-text-primary font-bold mb-2">{t('settings.title')}</h1>
           <p className="apple-body text-text-secondary">
-            Customize your reading experience
+            {t('settings.subtitle')}
           </p>
         </motion.div>
 
@@ -40,8 +65,8 @@ export default function Settings() {
                   <Palette className="h-5 w-5 text-accent" />
                 </div>
                 <div>
-                  <CardTitle>Appearance</CardTitle>
-                  <CardDescription>Customize how the app looks</CardDescription>
+                  <CardTitle>{t('settings.appearance.title')}</CardTitle>
+                  <CardDescription>{t('settings.appearance.description')}</CardDescription>
                 </div>
               </div>
             </CardHeader>
@@ -59,10 +84,10 @@ export default function Settings() {
                     </div>
                     <div>
                       <h3 className="apple-callout font-medium text-text-primary">
-                        Dark Mode
+                        {t('settings.appearance.darkMode')}
                       </h3>
                       <p className="apple-caption-1 text-text-secondary">
-                        {isDarkMode ? 'Dark theme is enabled' : 'Light theme is enabled'}
+                        {isDarkMode ? t('settings.appearance.darkModeEnabled') : t('settings.appearance.lightModeEnabled')}
                       </p>
                     </div>
                   </div>
@@ -72,6 +97,33 @@ export default function Settings() {
                     onChange={toggleDarkMode}
                     size="md"
                   />
+                </div>
+
+                {/* Language Selection */}
+                <div className="flex items-center justify-between p-4 bg-surface-2 rounded-2xl">
+                  <div className="flex items-center space-x-3">
+                    <div className="p-2 bg-surface-3 rounded-xl">
+                      <Languages className="h-4 w-4 text-text-primary" />
+                    </div>
+                    <div>
+                      <h3 className="apple-callout font-medium text-text-primary">
+                        {t('settings.language.title')}
+                      </h3>
+                      <p className="apple-caption-1 text-text-secondary">
+                        {t('settings.language.description')}
+                      </p>
+                    </div>
+                  </div>
+                  
+                  <Select value={currentLanguage} onValueChange={i18n.changeLanguage}>
+                    <SelectTrigger className="w-32">
+                      <SelectValue>{getLanguageDisplayName(currentLanguage)}</SelectValue>
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="en">{t('settings.language.english')}</SelectItem>
+                      <SelectItem value="zh">{t('settings.language.chinese')}</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
             </CardContent>
@@ -85,30 +137,45 @@ export default function Settings() {
           >
             <Card>
               <CardHeader>
-                <CardTitle>About komu</CardTitle>
-                <CardDescription>Japanese manga reading companion</CardDescription>
+                <CardTitle>{t('settings.about.title')}</CardTitle>
+                <CardDescription>{t('settings.about.description')}</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
                   <div className="bg-surface-2 rounded-2xl p-4">
                     <div className="text-center space-y-2">
-                      <div className="w-16 h-16 bg-accent/10 rounded-2xl flex items-center justify-center mx-auto">
-                        <span className="apple-title-3 font-bold text-accent">こ</span>
-                      </div>
+                      <motion.button
+                        onClick={handleIconClick}
+                        className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto overflow-hidden"
+                        whileHover={{ 
+                          scale: 1.05,
+                          transition: { type: "spring", stiffness: 400, damping: 25 }
+                        }}
+                        whileTap={{ 
+                          scale: 0.95,
+                          transition: { type: "spring", stiffness: 500, damping: 30 }
+                        }}
+                      >
+                        <img 
+                          src="/icon-512.png" 
+                          alt="Komu icon" 
+                          className="w-full h-full object-cover rounded-2xl select-none pointer-events-none"
+                          style={{ WebkitTouchCallout: 'none' }}
+                        />
+                      </motion.button>
                       <h3 className="apple-headline font-semibold text-text-primary">komu</h3>
                       <p className="apple-footnote text-text-secondary">
-                        Version 1.0.0
+                        {t('settings.about.version')}
                       </p>
                     </div>
                   </div>
                   
                   <div className="space-y-3 apple-footnote text-text-secondary">
                     <p>
-                      komu is a self-hosted manga reader designed specifically for Japanese language learning.
+                      {t('settings.about.aboutText1')}
                     </p>
                     <p>
-                      Features include OCR text extraction, grammar analysis, and seamless reading modes
-                      to enhance your Japanese reading experience.
+                      {t('settings.about.aboutText2')}
                     </p>
                   </div>
                 </div>
@@ -117,6 +184,12 @@ export default function Settings() {
           </motion.div>
         </motion.div>
       </div>
+
+      {/* Komi-chan Visual Novel Easter Egg */}
+      <KomiEasterEgg 
+        isVisible={showKomiEasterEgg} 
+        onClose={handleEasterEggClose} 
+      />
     </motion.div>
   )
 }

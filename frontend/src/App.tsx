@@ -26,6 +26,22 @@ function AppContent() {
   // Initialize dark mode at app level
   const { isDarkMode } = useDarkMode()
 
+  // Reset scroll position when route changes (only for reader pages that need it)
+  useEffect(() => {
+    const shouldResetScroll = !location.pathname.startsWith('/reader/')
+    
+    if (shouldResetScroll) {
+      // Only reset scroll for pages that specifically need it (like upload flow)
+      const needsScrollReset = location.pathname.includes('/upload') || 
+                               location.pathname.includes('/organize') ||
+                               location.pathname.includes('/metadata/')
+      
+      if (needsScrollReset) {
+        window.scrollTo(0, 0)
+      }
+    }
+  }, [location.pathname])
+
   // Only show OCR progress outside of reader page
   const isReaderPage = location.pathname.startsWith('/reader/')
   const shouldShowProgress = !isReaderPage && 

@@ -14,6 +14,7 @@ import { useReaderNavigation } from '@/hooks/useReaderNavigation'
 import { useReaderDebug } from '@/hooks/useReaderDebug'
 import { useDarkMode } from '@/hooks/useDarkMode'
 import { ReadingMode, Manga, TextBlock, READER_CONSTANTS } from '@/constants/reader'
+import { useTranslation } from 'react-i18next'
 
 export default function Reader() {
   const { id, page: urlPage } = useParams()
@@ -97,6 +98,7 @@ export default function Reader() {
   const ocrService = useOcrService()
   const { debugCurrentState } = useReaderDebug()
   const { isDarkMode } = useDarkMode()
+  const { t } = useTranslation()
 
   const handlePageChange = useCallback(() => {
     if (readingMode !== 'scrolling') {
@@ -501,7 +503,7 @@ export default function Reader() {
     }
 
     return (
-      <div className="h-full">
+      <div className="h-full relative" style={{ zIndex: 1 }}>
         {readingMode === 'scrolling' ? (
           <ScrollingGallery 
             {...baseProps}
@@ -572,11 +574,11 @@ export default function Reader() {
                     </Button>
                   </motion.div>
                   <div className="min-w-0 flex-1">
-                    <h1 className="apple-headline text-white font-semibold truncate">{manga.title}</h1>
+                    <h1 className="apple-headline text-white font-semibold truncate" lang="ja">{manga.title}</h1>
                     <p className="apple-caption-1 text-white/70 mt-0.5">
                       {manga.type && manga.number ? 
-                        `${manga.type} ${manga.number}` : 
-                        `Page ${currentPage + 1} of ${manga.pages.length}`}
+                        t(`metadata.types.${manga.type.toLowerCase()}`, { number: manga.number }) : 
+                        t('reader.pageCount', { current: currentPage + 1, total: manga.pages.length })}
                     </p>
                   </div>
                 </div>
@@ -622,7 +624,7 @@ export default function Reader() {
             }}
           >
             <div className="p-6 min-w-[240px]">
-              <h3 className="apple-headline text-text-primary font-semibold mb-4">Reading Mode</h3>
+              <h3 className="apple-headline text-text-primary font-semibold mb-4">{t('reader.readingMode')}</h3>
               <div className="space-y-2">
                 <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
                   <Button
@@ -632,7 +634,7 @@ export default function Reader() {
                     className="w-full justify-start apple-callout font-medium transition-all duration-200 rounded-xl h-12"
                   >
                     <BookOpen className="h-4 w-4 mr-3" />
-                    Right to Left (RTL)
+                    {t('reader.modes.rtl')}
                   </Button>
                 </motion.div>
                 <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
@@ -643,7 +645,7 @@ export default function Reader() {
                     className="w-full justify-start apple-callout font-medium transition-all duration-200 rounded-xl h-12"
                   >
                     <Monitor className="h-4 w-4 mr-3" />
-                    Left to Right (LTR)
+                    {t('reader.modes.ltr')}
                   </Button>
                 </motion.div>
                 <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
@@ -654,7 +656,7 @@ export default function Reader() {
                     className="w-full justify-start apple-callout font-medium transition-all duration-200 rounded-xl h-12"
                   >
                     <Scroll className="h-4 w-4 mr-3" />
-                    Continuous Scrolling
+                    {t('reader.modes.scroll')}
                   </Button>
                 </motion.div>
               </div>
@@ -665,6 +667,25 @@ export default function Reader() {
 
       {/* Main Content */}
       {renderContent()}
+
+      {/* Bottom Blur Overlay */}
+      <AnimatePresence>
+        {showUI && (
+          <motion.div 
+            initial={{ opacity: 0, y: 30 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 30 }}
+            transition={{ 
+              type: "spring",
+              stiffness: 400,
+              damping: 25,
+              delay: 0.1
+            }}
+            className="absolute left-0 right-0 reader-gradient-bottom reader-bottom-blur-height"
+            style={{ zIndex: 5 }}
+          />
+        )}
+      </AnimatePresence>
 
       {/* Floating Bottom Panel */}
       <AnimatePresence>
@@ -782,11 +803,11 @@ export default function Reader() {
             : ocrService.singlePageImageSize
         }
         onSheetExpansionChange={(progress) => {
-          console.log('Reader received sheet progress:', progress)
           setSheetProgress(progress)
         }}
         onEditingStateChange={setIsEditingOcrText}
         onRefetchTextBlocks={handleRefetchTextBlocks}
+        mangaId={id}
       />
 
       <div id="grammar-breakdown-portal"></div>

@@ -241,9 +241,10 @@ class OcrQueueManager extends EventEmitter {
     const imageBuffer = fs.readFileSync(imagePath)
     const imageBlob = new Blob([imageBuffer], { type: 'image/jpeg' })
     formData.append('file', imageBlob, path.basename(imagePath))
+    formData.append('text_detection', 'true')
     formData.append('original_path', imagePath)
     
-    const response = await fetch(`${INFERENCE_SERVICE_URL}/ocr/detect`, {
+    const response = await fetch(`${INFERENCE_SERVICE_URL}/ocr`, {
       method: 'POST',
       body: formData
     })

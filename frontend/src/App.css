@@ -1,5 +1,6 @@
 @import url('https://fonts.googleapis.com/css2?family=Kosugi+Maru&display=swap');
 @import url('https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@100;200;300;400;500;600;700;800;900&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -116,11 +117,15 @@
   }
   body {
     @apply bg-background text-foreground;
-    font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'SF Pro Display', 'SF Pro Text', 'Helvetica Neue', Helvetica, Arial, 'Kosugi Maru', sans-serif;
     font-feature-settings: 'kern' 1, 'liga' 1, 'calt' 1;
     text-rendering: optimizeLegibility;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* Japanese content specific font */
+  :lang(ja) {
+    font-family: 'Kosugi Maru';
   }
 
   /* Apple Typography Scale */
@@ -494,6 +499,59 @@
     0 8px 32px rgba(0, 0, 0, 0.3),
     0 2px 8px rgba(0, 0, 0, 0.15),
     inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+/* Reader bottom gradient blur overlay - similar to top but inverted */
+.reader-gradient-bottom {
+  background: linear-gradient(
+    to top,
+    rgba(0, 0, 0, 0.95) 0%,
+    rgba(0, 0, 0, 0.95) 30%,
+    rgba(0, 0, 0, 0.8) 45%,
+    rgba(0, 0, 0, 0.6) 60%,
+    rgba(0, 0, 0, 0.4) 75%,
+    rgba(0, 0, 0, 0.2) 85%,
+    transparent 100%
+  );
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  mask-image: linear-gradient(
+    to top,
+    black 0%,
+    black 50%,
+    rgba(0, 0, 0, 0.95) 65%,
+    rgba(0, 0, 0, 0.8) 75%,
+    rgba(0, 0, 0, 0.5) 85%,
+    rgba(0, 0, 0, 0.2) 92%,
+    transparent 100%
+  );
+  -webkit-mask-image: linear-gradient(
+    to top,
+    black 0%,
+    black 50%,
+    rgba(0, 0, 0, 0.95) 65%,
+    rgba(0, 0, 0, 0.8) 75%,
+    rgba(0, 0, 0, 0.5) 85%,
+    rgba(0, 0, 0, 0.2) 92%,
+    transparent 100%
+  );
+}
+
+/* Bottom blur height - different for PWA vs non-PWA */
+.reader-bottom-blur-height {
+  /* Non-PWA: shorter height since no notch */
+  bottom: -60px;
+  height: 180px;
+  padding-bottom: 60px;
+}
+
+/* PWA mode: taller height to account for safe areas */
+@media (display-mode: standalone) {
+  .reader-bottom-blur-height {
+    bottom: -90px;
+    height: 270px;
+    padding-bottom: 90px;
+  }
 }
 
 

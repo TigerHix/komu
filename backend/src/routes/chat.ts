@@ -1,5 +1,6 @@
 import { Elysia, t } from 'elysia'
 import { promptLoader } from '../lib/prompt-loader'
+import { prisma } from '../lib/db'
 
 interface ChatMessage {
   role: 'user' | 'assistant' | 'system'
@@ -11,6 +12,8 @@ interface ChatRequest {
   selectedText: string
   sentence: string
   isWholeSentence: boolean
+  language?: string
+  mangaId?: string
 }
 
 export const chatRoutes = new Elysia({ prefix: '/api/explanations' })
@@ -22,7 +25,28 @@ export const chatRoutes = new Elysia({ prefix: '/api/explanations' })
         return { error: 'OpenRouter API key not configured' }
       }
 
-      const { messages, selectedText, sentence, isWholeSentence } = body as ChatRequest
+      const { messages, selectedText, sentence, isWholeSentence, language = 'en', mangaId } = body as ChatRequest
+
+      // Get manga metadata if mangaId is provided
+      let mangaTitle: string | undefined
+      let mangaDescription: string | undefined
+      
+      if (mangaId) {
+        const manga = await prisma.manga.findUnique({
+          where: { id: mangaId },
+          select: { title: true, author: true, type: true }
+        })
+        
+        if (manga) {
+          mangaTitle = manga.title || undefined
+          mangaDescription = manga.author ? `Author: ${manga.author}` : undefined
+          if (manga.type && mangaDescription) {
+            mangaDescription += ` | Type: ${manga.type}`
+          } else if (manga.type) {
+            mangaDescription = `Type: ${manga.type}`
+          }
+        }
+      }
 
       // Build the conversation with proper context
       const contextualMessages: ChatMessage[] = []
@@ -30,13 +54,13 @@ export const chatRoutes = new Elysia({ prefix: '/api/explanations' })
       // Add system prompt
       contextualMessages.push({
         role: 'system',
-        content: promptLoader.getSystemPrompt()
+        content: promptLoader.getSystemPrompt(language, mangaTitle, mangaDescription)
       })
       
       // Add user prompt with context - different prompts for whole sentence vs partial selection
       const userPrompt = isWholeSentence 
-        ? promptLoader.getUserPrompt('whole-sentence', sentence)
-        : promptLoader.getUserPrompt('partial-selection', sentence, selectedText)
+        ? promptLoader.getUserPrompt('whole-sentence', sentence, undefined, language, mangaTitle)
+        : promptLoader.getUserPrompt('partial-selection', sentence, selectedText, language, mangaTitle)
       
       contextualMessages.push({
         role: 'user',
@@ -96,7 +120,9 @@ export const chatRoutes = new Elysia({ prefix: '/api/explanations' })
       })),
       selectedText: t.String(),
       sentence: t.String(),
-      isWholeSentence: t.Boolean()
+      isWholeSentence: t.Boolean(),
+      language: t.Optional(t.String()),
+      mangaId: t.Optional(t.String())
     })
   })
 
@@ -108,7 +134,28 @@ export const chatRoutes = new Elysia({ prefix: '/api/explanations' })
         return { error: 'OpenRouter API key not configured' }
       }
 
-      const { messages, selectedText, sentence, isWholeSentence } = body as ChatRequest
+      const { messages, selectedText, sentence, isWholeSentence, language = 'en', mangaId } = body as ChatRequest
+
+      // Get manga metadata if mangaId is provided
+      let mangaTitle: string | undefined
+      let mangaDescription: string | undefined
+      
+      if (mangaId) {
+        const manga = await prisma.manga.findUnique({
+          where: { id: mangaId },
+          select: { title: true, author: true, type: true }
+        })
+        
+        if (manga) {
+          mangaTitle = manga.title || undefined
+          mangaDescription = manga.author ? `Author: ${manga.author}` : undefined
+          if (manga.type && mangaDescription) {
+            mangaDescription += ` | Type: ${manga.type}`
+          } else if (manga.type) {
+            mangaDescription = `Type: ${manga.type}`
+          }
+        }
+      }
 
       // Build the conversation with proper context
       const contextualMessages: ChatMessage[] = []
@@ -116,13 +163,13 @@ export const chatRoutes = new Elysia({ prefix: '/api/explanations' })
       // Add system prompt
       contextualMessages.push({
         role: 'system',
-        content: promptLoader.getSystemPrompt()
+        content: promptLoader.getSystemPrompt(language, mangaTitle, mangaDescription)
       })
       
       // Add user prompt with context - different prompts for whole sentence vs partial selection
       const userPrompt = isWholeSentence 
-        ? promptLoader.getUserPrompt('whole-sentence', sentence)
-        : promptLoader.getUserPrompt('partial-selection', sentence, selectedText)
+        ? promptLoader.getUserPrompt('whole-sentence', sentence, undefined, language, mangaTitle)
+        : promptLoader.getUserPrompt('partial-selection', sentence, selectedText, language, mangaTitle)
       
       contextualMessages.push({
         role: 'user',
@@ -179,6 +226,8 @@ export const chatRoutes = new Elysia({ prefix: '/api/explanations' })
       })),
       selectedText: t.String(),
       sentence: t.String(),
-      isWholeSentence: t.Boolean()
+      isWholeSentence: t.Boolean(),
+      language: t.Optional(t.String()),
+      mangaId: t.Optional(t.String())
     })
   })

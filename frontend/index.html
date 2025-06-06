@@ -14,15 +14,144 @@
     <!-- PWA Manifest -->
     <link rel="manifest" href="/manifest.json" />
     
+    <!-- Theme color for status bar - will be updated by script -->
+    <meta name="theme-color" content="#fafafa" />
+    
     <!-- Prevent iOS bounce scrolling and other unwanted behaviors -->
     <meta name="format-detection" content="telephone=no" />
     <meta name="msapplication-tap-highlight" content="no" />
     
     <title>komu</title>
     
+    <!-- Critical CSS to prevent FOUC (Flash of Unstyled Content) -->
+    <style>
+      /* Immediate basic styling before main CSS loads */
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+      
+      html, body {
+        height: 100%;
+        font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+        background: #fafafa;
+        color: #1c1c1e;
+        overflow-x: hidden;
+      }
+      
+      /* Dark mode detection - fallback for system preference */
+      @media (prefers-color-scheme: dark) {
+        html, body {
+          background: #0f0f11;
+          color: #fafafa;
+        }
+      }
+      
+      /* Dark mode class override (takes precedence over media query) */
+      html.dark, html.dark body {
+        background: #0f0f11 !important;
+        color: #fafafa !important;
+      }
+      
+      /* Light mode class override */
+      html.light, html.light body {
+        background: #fafafa !important;
+        color: #1c1c1e !important;
+      }
+      
+      /* PWA safe areas for immediate application */
+      @media (display-mode: standalone) {
+        html {
+          min-height: calc(100% + env(safe-area-inset-top));
+          padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+        }
+      }
+      
+      #root {
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+      }
+      
+      /* Loading state to hide content until React mounts */
+      #root:empty::before {
+        content: '';
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: #fafafa;
+        z-index: 9999;
+      }
+      
+      @media (prefers-color-scheme: dark) {
+        #root:empty::before {
+          background: #0f0f11;
+        }
+      }
+      
+      /* Dark mode class override for loading screen */
+      html.dark #root:empty::before {
+        background: #0f0f11 !important;
+      }
+      
+      html.light #root:empty::before {
+        background: #fafafa !important;
+      }
+      
+      /* Prevent any flash of content before React hydrates */
+      .js-loading #root > * {
+        opacity: 0;
+      }
+    </style>
+    
+    <!-- Apply user's saved theme preference immediately -->
+    <script>
+      (function() {
+        try {
+          const stored = localStorage.getItem('darkMode');
+          const isDarkMode = stored !== null 
+            ? JSON.parse(stored)
+            : window.matchMedia('(prefers-color-scheme: dark)').matches;
+          
+          // Update theme color for status bar/notch
+          const themeColorMeta = document.querySelector('meta[name="theme-color"]');
+          
+          if (isDarkMode) {
+            document.documentElement.classList.add('dark');
+            document.documentElement.classList.remove('light');
+            if (themeColorMeta) themeColorMeta.setAttribute('content', '#0f0f11');
+          } else {
+            document.documentElement.classList.add('light');
+            document.documentElement.classList.remove('dark');
+            if (themeColorMeta) themeColorMeta.setAttribute('content', '#fafafa');
+          }
+        } catch (e) {
+          // Fallback to system preference if localStorage fails
+          const themeColorMeta = document.querySelector('meta[name="theme-color"]');
+          if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+            document.documentElement.classList.add('dark');
+            if (themeColorMeta) themeColorMeta.setAttribute('content', '#0f0f11');
+          } else {
+            document.documentElement.classList.add('light');
+            if (themeColorMeta) themeColorMeta.setAttribute('content', '#fafafa');
+          }
+        }
+      })();
+    </script>
+    
   </head>
-  <body>
+  <body class="js-loading">
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
+    
+    <!-- Remove loading class once JavaScript starts executing -->
+    <script>
+      document.body.classList.remove('js-loading');
+    </script>
   </body>
 </html>

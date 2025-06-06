@@ -34,6 +34,7 @@ cd inference && ./start_service.sh  # Terminal 3
 - **Grammar Analysis**: Japanese tokenization with furigana
 - **PWA Support**: Full-screen iOS experience with notch embrace
 - **Apple-Style UI**: SF Pro typography, spring animations
+- **Internationalization**: English/Chinese support with localStorage persistence
 
 ## Reading Modes
 
@@ -239,6 +240,13 @@ expect(mockService).toHaveBeenCalledTimes(2)
 - **Mock Verification**: Ensure expected service calls
 - **Database State**: Verify data persistence and relationships
 - **File Operations**: Test upload, processing, and cleanup flows
+
+## Internationalization (i18n)
+- **Library**: react-i18next with browser language detection
+- **Languages**: English (en) and Chinese (zh)
+- **Storage**: localStorage persistence, English fallback
+- **Files**: `src/i18n/index.ts` + `locales/en.json` + `locales/zh.json`
+- **Settings**: Language switcher in Settings page
 
 ## Database Schema
 - **manga**: title, author, type, pages, OCR status

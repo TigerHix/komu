@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
+import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { useToast } from '@/components/ui/use-toast'
@@ -23,13 +24,14 @@ export default function OrganizePages() {
   const navigate = useNavigate()
   const location = useLocation()
   const { toast } = useToast()
+  const { t } = useTranslation()
 
   useEffect(() => {
     const images = location.state?.images as File[]
     if (!images || images.length === 0) {
       toast({
-        title: 'No images found',
-        description: 'Please go back and select images',
+        title: t('notifications.organize.noImages'),
+        description: t('notifications.organize.noImagesDesc'),
         variant: 'destructive'
       })
       navigate('/upload')
@@ -149,16 +151,16 @@ export default function OrganizePages() {
     ))
 
     toast({
-      title: 'Image cropped',
-      description: 'The image has been successfully cropped'
+      title: t('notifications.organize.imageCropped'),
+      description: t('notifications.organize.imageCroppedDesc')
     })
   }
 
   const handleUpload = async () => {
     if (pages.length === 0) {
       toast({
-        title: 'No pages to upload',
-        description: 'Please add at least one page',
+        title: t('notifications.organize.noPagesToUpload'),
+        description: t('notifications.organize.noPagesToUploadDesc'),
         variant: 'destructive'
       })
       return
@@ -166,8 +168,8 @@ export default function OrganizePages() {
 
     if (!title.trim()) {
       toast({
-        title: 'Title required',
-        description: 'Please enter a title for your manga',
+        title: t('notifications.organize.titleRequired'),
+        description: t('notifications.organize.titleRequiredDesc'),
         variant: 'destructive'
       })
       return
@@ -196,15 +198,15 @@ export default function OrganizePages() {
       const result = await response.json()
       
       toast({
-        title: 'Upload successful',
-        description: `${result.title} has been uploaded successfully`
+        title: t('notifications.organize.uploadSuccessful'),
+        description: t('notifications.organize.uploadSuccessfulDesc', { title: result.title })
       })
 
       navigate(`/metadata/${result.id}`)
     } catch (error) {
       toast({
-        title: 'Upload failed',
-        description: 'There was an error uploading your files',
+        title: t('notifications.organize.uploadFailed'),
+        description: t('notifications.organize.uploadFailedDesc'),
         variant: 'destructive'
       })
     } finally {

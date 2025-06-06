@@ -1,120 +1,172 @@
-import React from 'react'
-import { GrammarToken } from '@/utils/posUtils'
+import { GrammarToken } from '@/utils/grammarAnalysis'
 import { getPOSStyles } from '@/utils/posStyles'
 import { getPOSCategory } from '@/utils/posUtils'
 import { PartOfSpeechCategory } from '@/utils/grammarAnalysis'
+import { getLocalizedText, getLocalizedPartOfSpeech } from '@/utils/textLocalization'
+import { useTranslation } from 'react-i18next'
 
 interface TokenDetailsProps {
   token: GrammarToken
 }
 
-export function TokenDetails({ token }: TokenDetailsProps) {
-  const posStyles = getPOSStyles(token.partOfSpeech)
+function POSTag({ pos, t }: { pos: string, t: any }) {
+  return (
+    <span className={`px-1.5 py-0.5 text-xs font-medium rounded border select-pos ${getPOSStyles(pos).tag}`}>
+      {getLocalizedPartOfSpeech(pos, t)}
+    </span>
+  )
+}
+
+function MeaningItem({ meaning, t, showBullet = true }: { 
+  meaning: { text: string; partOfSpeech: string[]; info: string }, 
+  t: any,
+  showBullet?: boolean 
+}) {
+  return (
+    <div className="flex items-start gap-1">
+      {showBullet && <span className="mt-0.5">•</span>}
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-0 flex-1">
+        {meaning.partOfSpeech.length > 0 && (
+          <div className="flex flex-wrap gap-1 items-center">
+            {meaning.partOfSpeech.map((pos: string, posIdx: number) => (
+              <POSTag key={posIdx} pos={pos} t={t} />
+            ))}
+          </div>
+        )}
+        <div className="min-w-0 flex-1" style={{ flexBasis: '200px' }}>
+          <div>{getLocalizedText(meaning.text, t)}</div>
+          {meaning.info && (
+            <div className="text-xs text-text-tertiary mt-1 italic">
+              {meaning.info}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function TokenMeanings({ meanings, t }: { meanings: GrammarToken['meanings'], t: any }) {
+  if (!meanings.length) return null
   
   return (
-    <div className={`p-4 pb-2 rounded-xl border-2 shadow-md ${posStyles.border} ${posStyles.background}`}>
-      {/* Part of Speech Tags */}
-      <div className="flex flex-wrap gap-2 mb-3">
-        {token.partOfSpeech.map((pos, idx) => (
-          <span
-            key={idx}
-            className={`px-2 py-1 text-xs font-medium rounded-md border select-pos ${getPOSStyles([pos]).tag}`}
-          >
-            {pos}
-          </span>
-        ))}
-      </div>
-
-      {/* Compound Word Structure */}
-      {token.compound && (
-        <div className="mb-3">
-          <div className="text-xs font-medium text-text-secondary mb-2">Compound Word</div>
-          <div className="bg-surface-1 rounded-lg p-3 border border-border">
-            <div className="flex items-center gap-2 mb-3">
-              <span className="text-sm font-medium text-text-primary">Structure:</span>
-              {token.compound.parts.map((part, idx) => (
-                <span key={idx} className="inline-flex items-center">
-                  <span className="bg-primary/10 text-primary text-sm px-2 py-1 rounded">{part}</span>
-                  {idx < token.compound.parts.length - 1 && <span className="mx-1 text-text-tertiary">+</span>}
-                </span>
-              ))}
-            </div>
-            <div className="space-y-3">
-              {token.compound.components.map((component, idx) => (
-                <div key={idx} className="border-l-4 border-primary/20 pl-3">
-                  <div className="flex items-start gap-2 mb-1">
-                    <span className="font-medium text-primary">{component.word}</span>
-                    {component.reading && (
-                      <span className="text-xs text-text-tertiary">【{component.reading}】</span>
-                    )}
-                  </div>
-                  {component.conjugation.length > 0 && (
-                    <div className="text-xs text-accent mb-1">
-                      {component.conjugation.join(', ')}
-                    </div>
-                  )}
-                  {component.partOfSpeech.length > 0 && (
-                    <div className="text-xs text-text-tertiary mb-2">
-                      {component.partOfSpeech.join(', ')}
-                    </div>
-                  )}
-                  {component.meaning.length > 0 && (
-                    <div className="space-y-1">
-                      {component.meaning.map((meaning, mIdx) => (
-                        <div key={mIdx} className="text-sm text-text-primary select-definition">
-                          • {meaning}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              ))}
+    <div className="mb-3 space-y-2">
+      {meanings.map((meaning, idx: number) => (
+        <div key={idx} className="text-text-primary p-2 bg-surface-1 rounded-lg select-definition">
+          <div className="flex items-center gap-1">
+            <span className="font-medium text-text-primary min-w-[1.3rem]">{idx + 1}.</span>
+            <div className="flex-1">
+              <MeaningItem meaning={meaning} t={t} showBullet={false} />
             </div>
           </div>
         </div>
-      )}
+      ))}
+    </div>
+  )
+}
 
-      {/* Meanings - hide for punctuation and compound words */}
-      {!token.compound && token.meaning.length > 0 && getPOSCategory(token.partOfSpeech) !== PartOfSpeechCategory.PUNCTUATION ? (
-        <div className="mb-3">
-          {token.meaning.map((meaning, idx) => (
-            <div key={idx} className="text-text-primary mb-2 p-2 bg-surface-1 rounded-lg select-definition">
-              <span className="font-medium text-primary">{idx + 1}.</span> {meaning}
-            </div>
-          ))}
-        </div>
-      ) : null}
+function WordHeader({ token, t }: { token: GrammarToken, t: any }) {
+  const shouldShowPOSOnly = !token.components.length && 
+    token.meanings.length === 0 && 
+    token.alternatives.length === 0 &&
+    token.conjugations.length === 0 &&
+    token.partOfSpeech.length > 0 &&
+    !token.isSuffix
 
-      {/* Conjugation Info */}
-      {token.conjugation && token.conjugation.length > 0 && (
+  return (
+    <div className="py-2 pb-3">
+      {/* Word and reading */}
+      <div className="flex items-start mb-1">
+        <span className="font-medium text-text-primary select-text text-lg">{token.word}</span>
+        {token.reading && (
+          <span className="text-xs text-text-tertiary select-text">【{token.reading}】</span>
+        )}
+      </div>
+
+       {/* POS only display */}
+      {shouldShowPOSOnly && <POSTag pos={token.partOfSpeech} t={t} />}
+
+      {/* Conjugation types and suffix below */}
+      <div className="flex flex-wrap gap-1">
+        {token.conjugationTypes && token.conjugationTypes.length > 0 && 
+          token.conjugationTypes.map((conj: string, idx: number) => (
+            <POSTag key={`conj-${idx}`} pos={t(`grammarBreakdown.conjugation.${conj}`, conj)} t={t} />
+          ))
+        }
+        {token.suffix && (
+          <POSTag pos={t(`grammarBreakdown.suffixDescriptions.${token.suffix}`, token.suffix)} t={t} />
+        )}
+      </div>
+    </div>
+  )
+}
+
+export function TokenDetails({ token }: TokenDetailsProps) {
+  const { t } = useTranslation()
+  const partOfSpeech = token.partOfSpeech
+  const posStyles = getPOSStyles(partOfSpeech)
+  
+  const shouldShowMeanings = !token.components.length && 
+    token.meanings.length > 0 && 
+    getPOSCategory(partOfSpeech) !== PartOfSpeechCategory.PUNCTUATION
+  
+  return (
+    <div className={`px-4 pt-3 rounded-xl border-2 shadow-md ${posStyles.border} ${posStyles.background}`}>
+      {/* Word header for sub-tokens */}
+      <WordHeader token={token} t={t} />
+
+      {/* Main token meanings */}
+      {shouldShowMeanings && <TokenMeanings meanings={token.meanings} t={t} />}
+      
+      {/* Components (compound word breakdown) */}
+      {token.components.length > 0 && (
         <div className="mb-3">
-          <div className="text-xs font-medium text-text-secondary mb-1">Conjugation</div>
-          <div className="flex flex-wrap gap-1">
-            {token.conjugation.map((conj, idx) => (
-              <div key={idx} className="text-sm text-accent bg-accent/10 px-2 py-1 rounded">
-                {conj}
-              </div>
+          <div className="text-xs font-medium text-text-secondary mb-2 select-text">
+            {t('grammarBreakdown.structure')}
+          </div>
+          {/* Structure overview */}
+          <div className="flex items-center gap-2 mb-3">
+            {token.components.map((component, idx: number) => (
+              <span key={idx} className="inline-flex items-center">
+                <span className="bg-primary/10 text-text-primary text-sm px-2 py-1 rounded">{component.word}</span>
+                {idx < token.components.length - 1 && <span className="mx-1 text-text-tertiary">+</span>}
+              </span>
+            ))}
+          </div>
+          {/* Component details */}
+          <div className="space-y-3">
+            {token.components.map((component, idx: number) => (
+              <TokenDetails key={idx} token={component} />
             ))}
           </div>
         </div>
       )}
-
-      {/* Alternative Readings/Meanings */}
-      {token.alternatives && token.alternatives.length > 0 && (
-        <div>
-          <div className="text-xs font-medium text-text-secondary mb-1">Alternative Meanings</div>
-          {token.alternatives.map((alt, idx) => (
-            <div key={idx} className="mb-2 p-2 bg-surface-1 rounded border border-border">
-              {alt.reading && (
-                <div className="text-xs text-text-tertiary mb-1">{alt.reading}</div>
-              )}
-              {alt.meaning.map((meaning, mIdx) => (
-                <div key={mIdx} className="text-sm text-text-primary select-definition">
-                  • {meaning}
-                </div>
-              ))}
-            </div>
-          ))}
+      
+      {/* Conjugations */}
+      {token.conjugations.length > 0 && (
+        <div className="mb-3">
+          <div className="text-xs font-medium text-text-secondary mb-2 select-text">
+            {token.hasConjugationVia ? t('grammarBreakdown.conjugationsVia') : t('grammarBreakdown.conjugations')}
+          </div>
+          <div className="space-y-3">
+            {token.conjugations.map((conjugation, idx: number) => (
+              <TokenDetails key={idx} token={conjugation} />
+            ))}
+          </div>
+        </div>
+      )}
+      
+      {/* Alternatives */}
+      {token.alternatives.length > 0 && (
+        <div className="mb-3">
+          <div className="text-xs font-medium text-text-secondary mb-2 select-text">
+            {t('grammarBreakdown.alternativeMeanings')}
+          </div>
+          <div className="space-y-3">
+            {token.alternatives.map((alternative, idx: number) => (
+              <TokenDetails key={idx} token={alternative} />
+            ))}
+          </div>
         </div>
       )}
     </div>
@@ -126,10 +178,12 @@ interface EmptySelectionProps {
 }
 
 export function EmptySelection({ className = '' }: EmptySelectionProps) {
+  const { t } = useTranslation()
+  
   return (
     <div className={`text-center py-12 ${className}`}>
-      <div className="text-text-secondary mb-2">Click on any word above to see its definition</div>
-      <div className="text-sm text-text-tertiary">Drag on words to select multiple for analysis</div>
+      <div className="text-text-secondary mb-2">{t('grammarBreakdown.instructions.clickWord')}</div>
+      <div className="text-sm text-text-tertiary">{t('grammarBreakdown.instructions.dragWords')}</div>
     </div>
   )
 }

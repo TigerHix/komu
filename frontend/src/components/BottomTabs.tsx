@@ -1,35 +1,15 @@
 import { motion, AnimatePresence } from 'framer-motion'
-import { useLocation, Link } from 'react-router-dom'
+import { useLocation, Link, useNavigate } from 'react-router-dom'
 import { Book, Download, Settings } from 'lucide-react'
 import { useState, useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 
 interface TabItem {
   id: string
-  label: string
+  labelKey: string
   icon: React.ReactNode
   path: string
 }
-
-const tabs: TabItem[] = [
-  {
-    id: 'library',
-    label: 'Library',
-    icon: <Book className="h-5 w-5" />,
-    path: '/'
-  },
-  {
-    id: 'import',
-    label: 'Import',
-    icon: <Download className="h-5 w-5" />,
-    path: '/import'
-  },
-  {
-    id: 'settings',
-    label: 'Settings',
-    icon: <Settings className="h-5 w-5" />,
-    path: '/settings'
-  }
-]
 
 interface BottomTabsProps {
   isHidden?: boolean
@@ -37,7 +17,30 @@ interface BottomTabsProps {
 
 export function BottomTabs({ isHidden = false }: BottomTabsProps) {
   const location = useLocation()
+  const navigate = useNavigate()
   const [shouldShow, setShouldShow] = useState(true)
+  const { t } = useTranslation()
+
+  const tabs: TabItem[] = [
+    {
+      id: 'library',
+      labelKey: 'navigation.library',
+      icon: <Book className="h-5 w-5" />,
+      path: '/'
+    },
+    {
+      id: 'import',
+      labelKey: 'navigation.import',
+      icon: <Download className="h-5 w-5" />,
+      path: '/import'
+    },
+    {
+      id: 'settings',
+      labelKey: 'navigation.settings',
+      icon: <Settings className="h-5 w-5" />,
+      path: '/settings'
+    }
+  ]
   
   useEffect(() => {
     // Don't show tabs on reader pages or when explicitly hidden
@@ -75,6 +78,37 @@ export function BottomTabs({ isHidden = false }: BottomTabsProps) {
 
   const activeTab = getActiveTab()
 
+  const handleTabClick = (tab: TabItem, e: React.MouseEvent) => {
+    // Only scroll to top if clicking Library tab while ALREADY on Library page
+    if (tab.id === 'library' && location.pathname === '/') {
+      e.preventDefault()
+      
+      // Robust scroll to top (same logic as App.tsx)
+      const scrollToTop = () => {
+        window.scrollTo(0, 0)
+        document.documentElement.scrollTop = 0
+        document.body.scrollTop = 0
+        
+        const currentBodyPosition = document.body.style.position
+        const currentBodyTop = document.body.style.top
+        
+        if (currentBodyPosition === 'fixed') {
+          document.body.style.position = ''
+          document.body.style.top = ''
+          window.scrollTo(0, 0)
+          setTimeout(() => {
+            document.body.style.position = currentBodyPosition
+            document.body.style.top = currentBodyTop
+          }, 0)
+        }
+      }
+      
+      scrollToTop()
+      setTimeout(scrollToTop, 10)
+    }
+    // For all other cases (including navigating TO Library from other pages), let normal Link navigation happen
+  }
+
   return (
     <AnimatePresence>
       {shouldShow && (
@@ -93,6 +127,7 @@ export function BottomTabs({ isHidden = false }: BottomTabsProps) {
             <Link
               key={tab.id}
               to={tab.path}
+              onClick={(e) => handleTabClick(tab, e)}
               className="relative flex flex-col items-center justify-center py-2 px-4 min-w-0 flex-1"
             >
               <motion.div
@@ -125,7 +160,7 @@ export function BottomTabs({ isHidden = false }: BottomTabsProps) {
                   transition={{ duration: 0.2 }}
                   className="apple-caption-2 text-center"
                 >
-                  {tab.label}
+                  {t(tab.labelKey)}
                 </motion.span>
               </motion.div>
             </Link>

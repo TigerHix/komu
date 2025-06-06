@@ -34,6 +34,7 @@ export function SentenceDisplay({
         <div 
           className="text-2xl text-text-primary font-medium"
           style={{ lineHeight: '4rem' }}
+          lang="ja"
         >
           {tokens.map((token, index) => (
             <span key={index} className="relative inline-block group pb-2 mr-0.5" style={{ lineHeight: '3rem' }}>

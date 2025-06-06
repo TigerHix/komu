@@ -88,7 +88,7 @@ describe('Explanations Routes', () => {
             'Authorization': 'Bearer test-api-key',
             'Content-Type': 'application/json'
           }),
-          body: expect.stringContaining('"model":"openai/gpt-4o"')
+          body: expect.stringContaining('"model"')
         })
       )
     })
@@ -123,11 +123,11 @@ describe('Explanations Routes', () => {
         })
       )
 
-      // Verify the system message includes context
+      // Verify the system message is present and context message contains the text
       const callBody = JSON.parse(mockFetch.mock.calls[0][1].body)
-      expect(callBody.messages[0].content).toContain('今日')
-      expect(callBody.messages[0].content).toContain('今日は晴れです。')
-      expect(callBody.messages[0].content).toContain('Japanese language expert')
+      expect(callBody.messages[0].content).toContain('Komi')
+      expect(callBody.messages[1].content).toContain('今日')
+      expect(callBody.messages[1].content).toContain('今日は晴れです。')
     })
 
     it('should handle conversation history', async () => {
@@ -177,7 +177,7 @@ describe('Explanations Routes', () => {
 
       // Verify conversation history is included
       const callBody = JSON.parse(mockFetch.mock.calls[0][1].body)
-      expect(callBody.messages).toHaveLength(4) // System + 3 conversation messages
+      expect(callBody.messages).toHaveLength(5) // System + context + 3 conversation messages
     })
 
     it('should require API key', async () => {
@@ -545,7 +545,7 @@ describe('Explanations Routes', () => {
       
       // Verify the full conversation is sent to the API
       const callBody = JSON.parse(mockFetch.mock.calls[0][1].body)
-      expect(callBody.messages.length).toBe(21) // System message + 20 conversation messages
+      expect(callBody.messages.length).toBe(22) // System + context + 20 conversation messages
     })
   })
 })

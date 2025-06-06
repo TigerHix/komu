@@ -1,53 +1,60 @@
-import { readFileSync } from 'fs'
+import { readFileSync, existsSync } from 'fs'
 import { join } from 'path'
 
 class PromptLoader {
-  private prompts: Map<string, string> = new Map()
+  private promptsDir: string
+  private supportedLanguages = ['en', 'zh']
   
   constructor() {
-    this.loadPrompts()
+    this.promptsDir = join(__dirname, '../../prompts')
+    console.log(`Prompt loader initialized with directory: ${this.promptsDir}`)
+    console.log(`Supported languages: ${this.supportedLanguages.join(', ')}`)
   }
   
-  private loadPrompts() {
+  private loadPrompt(language: string, type: string): string {
+    // Fall back to English if requested language doesn't exist
+    const lang = this.supportedLanguages.includes(language) ? language : 'en'
+    const langDir = join(this.promptsDir, lang)
+    
+    if (!existsSync(langDir)) {
+      throw new Error(`Prompt directory not found for language: ${lang}`)
+    }
+    
+    const promptPath = join(langDir, `${type}.txt`)
+    if (!existsSync(promptPath)) {
+      throw new Error(`Prompt file not found: ${promptPath}`)
+    }
+    
     try {
-      const promptsDir = join(__dirname, '../../prompts')
-      
-      // Load system prompt
-      const systemPrompt = readFileSync(join(promptsDir, 'system.txt'), 'utf-8')
-      this.prompts.set('system', systemPrompt)
-      
-      // Load whole sentence prompt
-      const wholeSentencePrompt = readFileSync(join(promptsDir, 'whole-sentence.txt'), 'utf-8')
-      this.prompts.set('whole-sentence', wholeSentencePrompt)
-      
-      // Load partial selection prompt
-      const partialSelectionPrompt = readFileSync(join(promptsDir, 'partial-selection.txt'), 'utf-8')
-      this.prompts.set('partial-selection', partialSelectionPrompt)
-      
-      console.log('Successfully loaded system prompts')
+      return readFileSync(promptPath, 'utf-8').trim()
     } catch (error) {
-      console.error('Failed to load system prompts:', error)
-      throw new Error('Could not load system prompts')
+      console.error(`Failed to read prompt file: ${promptPath}`, error)
+      throw new Error(`Could not load prompt file: ${type} for language: ${lang}`)
     }
   }
   
-  getSystemPrompt(): string {
-    const prompt = this.prompts.get('system')
-    if (!prompt) {
-      throw new Error('System prompt not found')
+  getSystemPrompt(language: string = 'en', mangaTitle?: string, mangaDescription?: string): string {
+    let prompt = this.loadPrompt(language, 'system')
+    
+    if (mangaTitle) {
+      prompt = prompt.replace('[MANGA_TITLE]', mangaTitle)
     }
+    if (mangaDescription) {
+      prompt = prompt.replace('[MANGA_DESCRIPTION]', mangaDescription)
+    }
+    
     return prompt
   }
   
-  getUserPrompt(type: 'whole-sentence' | 'partial-selection', sentence: string, selectedText?: string): string {
-    const template = this.prompts.get(type)
-    if (!template) {
-      throw new Error(`Prompt template not found for type: ${type}`)
-    }
+  getUserPrompt(type: 'whole-sentence' | 'partial-selection', sentence: string, selectedText?: string, language: string = 'en', mangaTitle?: string): string {
+    const template = this.loadPrompt(language, type)
     
     let prompt = template.replace('[SENTENCE]', sentence)
     if (selectedText && type === 'partial-selection') {
       prompt = prompt.replace('[SELECTED_TEXT]', selectedText)
+    }
+    if (mangaTitle) {
+      prompt = prompt.replace('[MANGA_TITLE]', mangaTitle)
     }
     
     return prompt

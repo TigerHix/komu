@@ -148,8 +148,8 @@ export const PartOfSpeechLabels: Record<PartOfSpeech, string> = {
   [PartOfSpeech.SUF]: 'Suffix',
 
   // Verbs - Ichidan
-  [PartOfSpeech.V1]: 'Ichidan Verb',
-  [PartOfSpeech.V1_S]: 'Ichidan Verb (Special)',
+  [PartOfSpeech.V1]: 'Ichidan Verb (-ru)',
+  [PartOfSpeech.V1_S]: 'Ichidan Verb (-ru Special)',
 
   // Verbs - Godan
   [PartOfSpeech.V5ARU]: 'Godan Verb (-aru)',
@@ -307,24 +307,28 @@ interface IchiranWordInfo {
     field?: string
     info?: string
   }>
-  conj?: Array<{
-    prop?: Array<{
-      type: string
-      pos: string
-      form?: string
-      neg?: boolean
-    }>
-    reading?: string
-    gloss?: Array<{
-      pos: string
-      gloss: string
-    }>
-    readok?: boolean
-  }>
+  conj?: IchiranConjugation[]
   alternative?: IchiranWordInfo[]
   components?: IchiranWordInfo[]
   compound?: string[]
   suffix?: string
+}
+
+interface IchiranConjugation {
+  prop?: Array<{
+    type: string
+    pos: string
+    form?: string
+    neg?: boolean
+  }>
+  reading?: string
+  gloss?: Array<{
+    pos: string
+    gloss: string
+    info?: string
+  }>
+  readok?: boolean
+  via?: IchiranConjugation[]
 }
 
 interface IchiranToken {
@@ -345,26 +349,27 @@ interface IchiranResponse {
 
 // UI format for grammar breakdown component
 export interface GrammarToken {
+  isConjugation: boolean
+  conjugationTypes?: string[]
+  hasConjugationVia: boolean
+  isConjugationVia: boolean
+  isAlternative: boolean
+  isComponent: boolean
+  isSuffix: boolean
+  suffix?: string
+
   word: string
   reading: string
-  meaning: string[]
-  partOfSpeech: string[]
-  conjugation: string[]
-  isHighlighted?: boolean
-  alternatives?: Array<{
-    reading: string
-    meaning: string[]
+  partOfSpeech: string // The first part of speech from the meanings
+  meanings: Array<{
+    text: string
+    partOfSpeech: string[]
+    info: string
   }>
-  compound?: {
-    parts: string[]
-    components: Array<{
-      word: string
-      reading: string
-      meaning: string[]
-      partOfSpeech: string[]
-      conjugation: string[]
-    }>
-  }
+  
+  conjugations: GrammarToken[]
+  alternatives: GrammarToken[]
+  components: GrammarToken[]
 }
 
 /**
@@ -390,99 +395,93 @@ export async function analyzeGrammar(text: string): Promise<GrammarToken[]> {
       throw new Error('Tokenization was unsuccessful')
     }
 
-    return convertIchiranToGrammarTokens(data.tokens, text)
+    console.log("Ichiran data:", data.tokens)
+    const tokens = convertIchiranToGrammarTokens(data.tokens)
+    console.log("Grammar tokens:", tokens)
+    return tokens
   } catch (error) {
     console.error('Grammar analysis failed:', error)
     throw error
   }
 }
 
+function convertIchiranWordInfoToGrammarToken(wordInfo: IchiranWordInfo): GrammarToken {
+  // Does the word ONLY have alternatives?
+  if (!wordInfo.score && wordInfo.alternative && wordInfo.alternative.length > 0) {
+    return {
+        ...convertIchiranWordInfoToGrammarToken({
+          ...wordInfo.alternative[0]!,
+          alternative: wordInfo.alternative.slice(1),
+        })
+    }
+  }
+
+  const word = normalizeJapanesePunctuation(wordInfo.text).trim()
+
+  // Handle GAP tokens (punctuation) specially
+  if (wordInfo.type === 'GAP') {
+    return {
+      word,
+      reading: '',
+      partOfSpeech: PartOfSpeechLabels[PartOfSpeech.PUNCTUATION],
+      meanings: [],
+      isConjugation: false,
+      hasConjugationVia: false,
+      isConjugationVia: false,
+      isAlternative: false,
+      isComponent: false,
+      isSuffix: false,
+      conjugations: [],
+      alternatives: [],
+      components: [],
+    }
+  }
+  
+  // Extract reading (prefer kana over romanized, avoid romaji display)
+  let reading = extractReading(wordInfo, wordInfo.text).trim()
+  // Remove zero-width non-joiner character (Unicode 8204)
+  reading = reading.replace(/\u200C/g, '')
+  if (reading === word) {
+    reading = ''
+  }
+  
+  // Extract meanings with POS from gloss
+  const meanings = extractMeanings(wordInfo)
+  
+  // Extract compound word structure first
+  const components = extractComponents(wordInfo)
+  
+  // Extract conjugation info
+  const conjugations = extractConjugations(wordInfo)
+  
+  // Extract alternatives
+  const alternatives = extractAlternatives(wordInfo)
+
+  return {
+    word,
+    reading,
+    meanings,
+    partOfSpeech: extractPartOfSpeech(wordInfo) || '',
+    isConjugation: false,
+    hasConjugationVia: false,
+    isConjugationVia: false,
+    isAlternative: false,
+    isComponent: false,
+    isSuffix: wordInfo.suffix !== undefined,
+    suffix: wordInfo.suffix,
+    conjugations: conjugations || [],
+    alternatives: alternatives || [],
+    components: components || [],
+  }
+}
+
 /**
  * Convert Ichiran tokens to GrammarToken format
  */
-function convertIchiranToGrammarTokens(ichiranTokens: IchiranToken[], originalText: string): GrammarToken[] {
-  // Create a mapping of converted punctuation back to original
-  const punctuationMap: { [key: string]: string } = {
-    ', ': '、',
-    ',': '、',
-    '. ': '。',
-    '.': '。', 
-    '! ': '！',
-    '!': '！',
-    '? ': '？',
-    '?': '？'
-  }
-  
-  let textPosition = 0
-  
+function convertIchiranToGrammarTokens(ichiranTokens: IchiranToken[]): GrammarToken[] {
   return ichiranTokens.map(token => {
-    const wordInfo = token.info
-    
-    // Handle GAP tokens (punctuation) specially
-    if (wordInfo.type === 'GAP') {
-      const trimmedWord = token.word.trim()
-      let originalChar = punctuationMap[token.word] || punctuationMap[trimmedWord] || trimmedWord
-      
-      // For quotes and other punctuation, find the actual character in original text
-      if (trimmedWord === '"' || trimmedWord === "'" || trimmedWord === '(' || trimmedWord === ')') {
-        // Scan ahead in original text to find the actual punctuation character
-        while (textPosition < originalText.length) {
-          const char = originalText[textPosition]
-          if (/[、。！？「」『』（）【】〈〉《》〔〕［］｛｝"'()（）]/.test(char)) {
-            originalChar = char
-            textPosition++
-            break
-          }
-          textPosition++
-        }
-      } else {
-        textPosition++
-      }
-      
-      return {
-        word: originalChar,
-        reading: '',
-        meaning: [],
-        partOfSpeech: [PartOfSpeechLabels[PartOfSpeech.PUNCTUATION]],
-        conjugation: [],
-        alternatives: [],
-      }
-    }
-    
-    // For regular words, advance text position
-    textPosition += token.word.length
-    
-    // Extract reading (prefer kana over romanized, avoid romaji display)
-    const reading = extractReading(wordInfo, token.word)
-    
-    // Extract meanings from gloss
-    const meanings = extractMeanings(wordInfo)
-    
-    // Extract part of speech
-    const partOfSpeech = extractPartOfSpeech(wordInfo)
-    
-    // Extract conjugation info
-    const conjugation = extractConjugation(wordInfo)
-    
-    // Extract alternatives
-    const alternatives = extractAlternatives(wordInfo)
-    
-    // Extract compound word structure
-    const compound = extractCompoundStructure(wordInfo)
-
-    return {
-      word: token.word,
-      reading,
-      meaning: compound ? [] : meanings, // Don't show flattened meanings for compound words
-      partOfSpeech,
-      conjugation,
-      alternatives,
-      compound,
-    }
-  }).filter(token => 
-    // Filter out empty tokens but keep punctuation (which may be wrapped in spaces)
-    token.word.length > 0 && (token.word.trim().length > 0 || /[^\s]/.test(token.word))
-  )
+    return convertIchiranWordInfoToGrammarToken(token.info)
+  })
 }
 
 /**
@@ -534,74 +533,22 @@ function isKanaOnly(text: string): boolean {
 }
 
 /**
- * Extract meanings from gloss information
+ * Extract meanings with their POS tags from gloss information
  */
-function extractMeanings(wordInfo: IchiranWordInfo): string[] {
-  const meanings: string[] = []
+function extractMeanings(wordInfo: IchiranWordInfo): Array<{ text: string; partOfSpeech: string[]; info: string }> {
+  const meanings: Array<{ text: string; partOfSpeech: string[]; info: string }> = []
+  const seenMeanings = new Set<string>()
   
-  // Primary gloss
+  // Primary gloss - prioritize this for conjugated words
   if (wordInfo.gloss) {
     for (const glossItem of wordInfo.gloss) {
-      if (glossItem.gloss) {
-        meanings.push(glossItem.gloss)
-      }
-    }
-  }
-  
-  // Conjugation gloss
-  if (wordInfo.conj) {
-    for (const conjItem of wordInfo.conj) {
-      if (conjItem.gloss) {
-        for (const glossItem of conjItem.gloss) {
-          if (glossItem.gloss && !meanings.includes(glossItem.gloss)) {
-            meanings.push(glossItem.gloss)
-          }
-        }
-      }
-    }
-  }
-  
-  // Compound word components (for words like 引かなくても)
-  if (wordInfo.components && meanings.length === 0) {
-    for (const component of wordInfo.components) {
-      // Extract from component's direct gloss
-      if (component.gloss) {
-        for (const glossItem of component.gloss) {
-          if (glossItem.gloss && !meanings.includes(glossItem.gloss)) {
-            meanings.push(glossItem.gloss)
-          }
-        }
-      }
-      
-      // Extract from component's conjugation gloss
-      if (component.conj) {
-        for (const conjItem of component.conj) {
-          if (conjItem.gloss) {
-            for (const glossItem of conjItem.gloss) {
-              if (glossItem.gloss && !meanings.includes(glossItem.gloss)) {
-                meanings.push(glossItem.gloss)
-              }
-            }
-          }
-        }
-      }
-      
-      // Add suffix information if available
-      if (component.suffix && !meanings.includes(component.suffix)) {
-        meanings.push(component.suffix)
-      }
-    }
-  }
-  
-  // Alternative meanings (check early, not just as fallback)
-  if (wordInfo.alternative) {
-    for (const alt of wordInfo.alternative) {
-      if (alt.gloss) {
-        for (const glossItem of alt.gloss) {
-          if (glossItem.gloss && !meanings.includes(glossItem.gloss)) {
-            meanings.push(glossItem.gloss)
-          }
-        }
+      if (glossItem.gloss && !seenMeanings.has(glossItem.gloss)) {
+        meanings.push({
+          text: glossItem.gloss,
+          partOfSpeech: glossItem.pos ? parsePartOfSpeech(glossItem.pos) : [],
+          info: glossItem.info || ''
+        })
+        seenMeanings.add(glossItem.gloss)
       }
     }
   }
@@ -615,95 +562,77 @@ function extractMeanings(wordInfo: IchiranWordInfo): string[] {
       return [] // No meanings for incomplete entries
     } else {
       // This is a genuine parsing error - we have a word object but couldn't extract meaning
-      return ['Error parsing word']
+      return [{ text: 'Error parsing word', partOfSpeech: [], info: '' }]
     }
   }
   
   return meanings
 }
 
+function extractPartOfSpeechFromConjugation(conj: IchiranConjugation): string {
+  if (conj.prop) {
+    for (const propItem of conj.prop) {
+      if (propItem.pos) {
+        return parsePartOfSpeech(propItem.pos)[0] || ''
+      }
+    }
+  }
+  
+  if (conj.gloss) {
+    for (const glossItem of conj.gloss) {
+      if (glossItem.pos) {
+        return parsePartOfSpeech(glossItem.pos)[0] || ''
+      }
+    }
+  }
+  
+  return ''
+}
+
 /**
  * Extract part of speech information
  */
-function extractPartOfSpeech(wordInfo: IchiranWordInfo): string[] {
-  const pos: string[] = []
-  
+function extractPartOfSpeech(wordInfo: IchiranWordInfo): string {
   // From primary gloss
   if (wordInfo.gloss) {
     for (const glossItem of wordInfo.gloss) {
       if (glossItem.pos) {
-        const parsedPosList = parsePartOfSpeech(glossItem.pos)
-        for (const cleanedPos of parsedPosList) {
-          if (cleanedPos && !pos.includes(cleanedPos)) {
-            pos.push(cleanedPos)
-          }
-        }
+        return parsePartOfSpeech(glossItem.pos)[0] || ''
       }
     }
   }
   
   // From conjugation info
   if (wordInfo.conj) {
-    for (const conjItem of wordInfo.conj) {
-      if (conjItem.prop) {
-        for (const propItem of conjItem.prop) {
-          if (propItem.pos) {
-            const parsedPosList = parsePartOfSpeech(propItem.pos)
-            for (const cleanedPos of parsedPosList) {
-              if (cleanedPos && !pos.includes(cleanedPos)) {
-                pos.push(cleanedPos)
-              }
-            }
-          }
-        }
-      }
-      // Also check conjugation gloss for POS
-      if (conjItem.gloss) {
-        for (const glossItem of conjItem.gloss) {
-          if (glossItem.pos) {
-            const parsedPosList = parsePartOfSpeech(glossItem.pos)
-            for (const cleanedPos of parsedPosList) {
-              if (cleanedPos && !pos.includes(cleanedPos)) {
-                pos.push(cleanedPos)
-              }
-            }
-          }
-        }
+    for (const conj of wordInfo.conj) {
+      const pos = extractPartOfSpeechFromConjugation(conj)
+      if (pos) {
+        return pos
       }
     }
   }
   
   // From alternatives (this fixes tokens like 背 that come from alternative entries)
-  if (wordInfo.alternative && pos.length === 0) {
+  if (wordInfo.alternative) {
     for (const alt of wordInfo.alternative) {
       if (alt.gloss) {
         for (const glossItem of alt.gloss) {
           if (glossItem.pos) {
-            const parsedPosList = parsePartOfSpeech(glossItem.pos)
-            for (const cleanedPos of parsedPosList) {
-              if (cleanedPos && !pos.includes(cleanedPos)) {
-                pos.push(cleanedPos)
-              }
-            }
+            return parsePartOfSpeech(glossItem.pos)[0] || ''
           }
         }
       }
     }
   }
   
-  // From compound word components
-  if (wordInfo.components && pos.length === 0) {
+  // From compound word components - this is for the main word, not individual components
+  if (wordInfo.components) {
     for (const component of wordInfo.components) {
       // Extract POS from component's gloss
       if (component.gloss) {
         for (const glossItem of component.gloss) {
           if (glossItem.pos) {
-            const parsedPosList = parsePartOfSpeech(glossItem.pos)
-            for (const cleanedPos of parsedPosList) {
-              if (cleanedPos && !pos.includes(cleanedPos)) {
-                pos.push(cleanedPos)
-              }
-            }
+            return parsePartOfSpeech(glossItem.pos)[0] || ''
           }
         }
       }
@@ -714,25 +643,15 @@ function extractPartOfSpeech(wordInfo: IchiranWordInfo): string[] {
           if (conjItem.prop) {
             for (const propItem of conjItem.prop) {
               if (propItem.pos) {
-                const parsedPosList = parsePartOfSpeech(propItem.pos)
-                for (const cleanedPos of parsedPosList) {
-                  if (cleanedPos && !pos.includes(cleanedPos)) {
-                    pos.push(cleanedPos)
-                  }
-                }
+                return parsePartOfSpeech(propItem.pos)[0] || ''
               }
             }
           }
           if (conjItem.gloss) {
             for (const glossItem of conjItem.gloss) {
               if (glossItem.pos) {
-                const parsedPosList = parsePartOfSpeech(glossItem.pos)
-                for (const cleanedPos of parsedPosList) {
-                  if (cleanedPos && !pos.includes(cleanedPos)) {
-                    pos.push(cleanedPos)
-                  }
-                }
-              }
+                return parsePartOfSpeech(glossItem.pos)[0] || ''
+              } 
             }
           }
         }
@@ -741,11 +660,7 @@ function extractPartOfSpeech(wordInfo: IchiranWordInfo): string[] {
   }
   
   // Fallback based on word type
-  if (pos.length === 0) {
-    pos.push('Unknown')
-  }
-  
-  return pos
+  return 'Unknown'
 }
 
 /**
@@ -776,121 +691,134 @@ function parsePartOfSpeech(pos: string): string[] {
   return result.length > 0 ? result : [cleaned]
 }
 
+function convertIchiranConjugationToGrammarToken(conj: IchiranConjugation): GrammarToken {
+  let word = conj.reading || ''
+  let reading = conj.reading || ''
+  // Conjugation readings include the text like this: 出す 【だす】
+  if (word.includes('【')) {
+    const parts = word.split('【')
+    word = parts[0].trim()
+    // Check if the second part exists before calling replace
+    if (parts[1]) {
+      reading = parts[1].replace('】', '').trim()
+      if (reading === word) {
+        reading = ''
+      }
+    } else {
+      reading = ''
+    }
+  }
+  return {
+    isConjugation: true,
+    conjugationTypes: conj.prop?.map(prop => prop.type),
+    hasConjugationVia: conj.via !== undefined && conj.via.length > 0,
+    isConjugationVia: false,
+    isAlternative: false,
+    isComponent: false,
+    isSuffix: false,
+    suffix: undefined,
+    word,
+    reading,
+    partOfSpeech: extractPartOfSpeechFromConjugation(conj) || '',
+    meanings: conj.gloss?.map(gloss => ({
+      text: gloss.gloss,
+      partOfSpeech: parsePartOfSpeech(gloss.pos),
+      info: gloss.info || ''
+    })) || [],
+    conjugations: conj.via?.map(via => {
+      return {
+        ...convertIchiranConjugationToGrammarToken(via),
+        isConjugationVia: true
+      }
+    }) || [],
+    alternatives: [],
+    components: [],
+  }
+}
+
 /**
- * Extract conjugation information
+ * Extract full conjugation information including base form context
  */
-function extractConjugation(wordInfo: IchiranWordInfo): string[] {
-  const conjugations: string[] = []
-  
-  if (wordInfo.conjugations && wordInfo.conjugations !== 'ROOT') {
-    conjugations.push(wordInfo.conjugations)
+function extractConjugations(wordInfo: IchiranWordInfo): GrammarToken[] | undefined {
+  if (!wordInfo.conj || !wordInfo.conj.length) {
+    return undefined
   }
-  
-  if (wordInfo.conj && wordInfo.conj.length > 0) {
-    const conjInfo = wordInfo.conj[0]
-    if (conjInfo.prop && conjInfo.prop.length > 0) {
-      const propInfo = conjInfo.prop[0]
-      if (propInfo.type) {
-        conjugations.push(propInfo.type)
-      }
+
+  return wordInfo.conj.map(conj => {
+    return {
+      ...convertIchiranConjugationToGrammarToken(conj),
+      isConjugation: true
     }
-  }
-  
-  // Check alternatives for conjugation info
-  if (wordInfo.alternative) {
-    for (const alt of wordInfo.alternative) {
-      if (alt.conj && alt.conj.length > 0) {
-        const conjInfo = alt.conj[0]
-        if (conjInfo.prop && conjInfo.prop.length > 0) {
-          const propInfo = conjInfo.prop[0]
-          if (propInfo.type && !conjugations.includes(propInfo.type)) {
-            conjugations.push(propInfo.type)
-          }
-        }
-      }
-    }
-  }
-  
-  // Check compound word components for conjugation info
-  if (wordInfo.components) {
-    for (const component of wordInfo.components) {
-      if (component.conj && component.conj.length > 0) {
-        const conjInfo = component.conj[0]
-        if (conjInfo.prop && conjInfo.prop.length > 0) {
-          const propInfo = conjInfo.prop[0]
-          if (propInfo.type && !conjugations.includes(propInfo.type)) {
-            conjugations.push(propInfo.type)
-          }
-        }
-      }
-      
-      // Also check for suffix information
-      if (component.suffix && !conjugations.includes(component.suffix)) {
-        conjugations.push(component.suffix)
-      }
-    }
-  }
-  
-  return conjugations
+  })
 }
 
 /**
  * Extract alternative readings and meanings
  */
-function extractAlternatives(wordInfo: IchiranWordInfo): Array<{ reading: string; meaning: string[] }> {
-  const alternatives: Array<{ reading: string; meaning: string[] }> = []
-  
-  if (wordInfo.alternative) {
-    for (const alt of wordInfo.alternative) {
-      const reading = extractReading(alt, alt.text)
-      const meanings = extractMeanings(alt)
-      
-      if (reading || meanings.length > 0) {
-        alternatives.push({
-          reading: reading || alt.text,
-          meaning: meanings
-        })
-      }
-    }
+function extractAlternatives(wordInfo: IchiranWordInfo): GrammarToken[] | undefined {
+  if (!wordInfo.alternative || !wordInfo.alternative.length) {
+    return undefined
   }
-  
-  return alternatives
+
+  return wordInfo.alternative.map(alternative => {
+    return {
+      ...convertIchiranWordInfoToGrammarToken(alternative),
+      isAlternative: true
+    }
+  })
 }
 
 /**
  * Extract compound word structure if available
  */
-function extractCompoundStructure(wordInfo: IchiranWordInfo): { parts: string[]; components: Array<{ word: string; reading: string; meaning: string[]; partOfSpeech: string[]; conjugation: string[] }> } | undefined {
+function extractComponents(wordInfo: IchiranWordInfo): GrammarToken[] | undefined {
   if (!wordInfo.compound || !wordInfo.components || wordInfo.compound.length === 0 || wordInfo.components.length === 0) {
     return undefined
   }
   
-  const components = wordInfo.components.map(component => {
-    const reading = extractReading(component, component.text)
-    const meanings = extractMeanings(component)
-    const partOfSpeech = extractPartOfSpeech(component)
-    const conjugation = extractConjugation(component)
-    
+  return wordInfo.components.map(component => {
     return {
-      word: component.text,
-      reading,
-      meaning: meanings,
-      partOfSpeech,
-      conjugation,
+      ...convertIchiranWordInfoToGrammarToken(component),
+      isComponent: true
     }
   })
-  
-  return {
-    parts: wordInfo.compound,
-    components,
-  }
+}
+
+/**
+ * Normalize ASCII punctuation to Japanese punctuation
+ */
+export function normalizeJapanesePunctuation(text: string): string {
+  if (!text) return ''
+  // Handle combined cases first (order matters)
+  return text
+    .replace(/\?"/g, '？」')     // Combined question mark + quote
+    .replace(/!"/g, '！」')      // Combined exclamation + quote
+    .replace(/\?'/g, '？』')     // Combined question mark + single quote
+    .replace(/!'/g, '！』')      // Combined exclamation + single quote
+    // Individual character replacements
+    .replace(/\?/g, '？')        // Question mark
+    .replace(/!/g, '！')         // Exclamation mark
+    .replace(/ "/g, '「')
+    .replace(/" /g, '」')
+    .replace(/ '/g, '『')
+    .replace(/' /g, '』')
+    .replace(/,/g, '、')         // Comma
+    .replace(/\./g, '。')        // Period
+    .replace(/\(/g, '（')        // Opening parenthesis
+    .replace(/\)/g, '）')        // Closing parenthesis
+    .replace(/\[/g, '［')        // Opening square bracket
+    .replace(/\]/g, '］')        // Closing square bracket
+    .replace(/\{/g, '｛')        // Opening curly brace
+    .replace(/\}/g, '｝')        // Closing curly brace
 }
 
 /**
  * Clean text for tokenization (remove punctuation, normalize whitespace)
  */
 export function cleanTextForAnalysis(text: string): string {
-  return text
+  // First normalize punctuation, then clean
+  const normalized = normalizeJapanesePunctuation(text)
+  return normalized
     .replace(/\s+/g, ' ') // Normalize whitespace to single spaces
     .trim()
 }

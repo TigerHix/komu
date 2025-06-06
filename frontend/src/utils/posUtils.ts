@@ -2,46 +2,22 @@ import {
   PartOfSpeechCategory, 
   PartOfSpeechCategoryMap, 
   PartOfSpeech, 
-  PartOfSpeechLabels 
+  PartOfSpeechLabels, 
+  GrammarToken
 } from './grammarAnalysis'
 
-export interface GrammarToken {
-  word: string
-  reading: string
-  meaning: string[]
-  partOfSpeech: string[]
-  conjugation?: string
-  isHighlighted?: boolean
-  alternatives?: Array<{
-    reading: string
-    meaning: string[]
-  }>
-  compound?: {
-    parts: string[]
-    components: Array<{
-      word: string
-      reading: string
-      meaning: string[]
-      partOfSpeech: string[]
-      conjugation: string[]
-    }>
-  }
-}
-
-export function getPOSCategory(pos: string[]): PartOfSpeechCategory {
-  if (!pos || pos.length === 0) return PartOfSpeechCategory.OTHER
-  
-  const firstPos = pos[0]
+export function getPOSCategory(pos: string): PartOfSpeechCategory {
+  if (!pos) return PartOfSpeechCategory.OTHER
   
   // Check enum mapping first
   for (const [posEnum, label] of Object.entries(PartOfSpeechLabels)) {
-    if (label === firstPos) {
+    if (label === pos) {
       return PartOfSpeechCategoryMap[posEnum as PartOfSpeech]
     }
   }
   
   // Fallback string matching
-  const posStr = firstPos.toLowerCase()
+  const posStr = pos.toLowerCase()
   if (posStr === 'unknown') return PartOfSpeechCategory.UNKNOWN
   if (posStr === 'punctuation') return PartOfSpeechCategory.PUNCTUATION
   if (posStr.includes('noun') || posStr.includes('n')) return PartOfSpeechCategory.NOUN

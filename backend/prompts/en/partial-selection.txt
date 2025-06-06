@@ -1,0 +1,1 @@
+I want to understand the sentence "[SENTENCE]" and the part "[SELECTED_TEXT]" from the manga [MANGA_TITLE]. Please explain this selection in detail, including grammar, meaning, usage, and any relevant cultural context. Keep explanations clear and educational.

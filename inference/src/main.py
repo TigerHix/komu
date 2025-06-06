@@ -76,6 +76,7 @@ def initialize_models():
             print(f"❌ Failed to initialize models: {e}")
             raise e
 
+
 print(f"🎯 Ready to process OCR requests!")
 
 app = FastAPI(
@@ -119,14 +120,23 @@ async def health_check():
         }
     }
 
-@app.post("/ocr/detect")
-async def detect_text(file: UploadFile = File(...), original_path: Optional[str] = Form(None)):
+@app.post("/ocr")
+async def process_ocr(
+    file: UploadFile = File(...), 
+    text_detection: bool = Form(True),
+    original_path: Optional[str] = Form(None)
+):
     """
-    Detect text blocks in manga page image.
-    Returns bounding boxes and metadata for detected text regions.
+    OCR processing endpoint with configurable text detection.
+    
+    Args:
+        file: Image file to process
+        text_detection: If True, detect text blocks then extract text. If False, extract text from entire image.
+        original_path: Optional original file path for debug image naming
     """
     print(f"DEBUG: OCR endpoint called with file: {file.filename}")
     print(f"DEBUG: File content type: {file.content_type}")
+    print(f"DEBUG: Text detection enabled: {text_detection}")
     print(f"DEBUG: Original path parameter: {original_path}")
     
     # Ensure models are initialized
@@ -143,49 +153,20 @@ async def detect_text(file: UploadFile = File(...), original_path: Optional[str]
         print(f"DEBUG: Saved uploaded file to temp path: {tmp_file_path}")
     
     try:
-        print(f"DEBUG: Starting OCR detection for: {tmp_file_path}")
-        # Run OCR detection, pass original path for debug image if provided
-        debug_image_base_path = original_path if original_path else tmp_file_path
-        result = run_ocr_detection(tmp_file_path, debug_image_base_path)
-        print(f"DEBUG: OCR detection completed successfully")
+        if text_detection:
+            print(f"DEBUG: Starting OCR with text detection for: {tmp_file_path}")
+            # Run OCR detection, pass original path for debug image if provided
+            debug_image_base_path = original_path if original_path else tmp_file_path
+            result = run_ocr_detection(tmp_file_path, debug_image_base_path)
+            print(f"DEBUG: OCR with text detection completed successfully")
+        else:
+            print(f"DEBUG: Starting direct OCR for: {tmp_file_path}")
+            result = run_direct_ocr(tmp_file_path)
+            print(f"DEBUG: Direct OCR completed successfully")
+            
         return result
     except Exception as e:
-        print(f"DEBUG: OCR detection failed with error: {e}")
-        raise HTTPException(status_code=500, detail=f"OCR processing failed: {str(e)}")
-    finally:
-        # Clean up temporary file
-        if os.path.exists(tmp_file_path):
-            os.unlink(tmp_file_path)
-            print(f"DEBUG: Cleaned up temp file: {tmp_file_path}")
-
-@app.post("/ocr/text-only")
-async def extract_text_only(file: UploadFile = File(...)):
-    """
-    Extract text directly from image without text detection.
-    Useful for pre-cropped text regions where detection is not needed.
-    """
-    print(f"DEBUG: Text-only OCR endpoint called with file: {file.filename}")
-    
-    # Ensure models are initialized
-    initialize_models()
-    
-    if not file.content_type or not file.content_type.startswith('image/'):
-        raise HTTPException(status_code=400, detail="File must be an image")
-    
-    # Save uploaded file to temporary location
-    with tempfile.NamedTemporaryFile(delete=False, suffix='.jpg') as tmp_file:
-        content = await file.read()
-        tmp_file.write(content)
-        tmp_file_path = tmp_file.name
-        print(f"DEBUG: Saved uploaded file to temp path: {tmp_file_path}")
-    
-    try:
-        print(f"DEBUG: Starting direct OCR for: {tmp_file_path}")
-        result = run_direct_ocr(tmp_file_path)
-        print(f"DEBUG: Direct OCR completed successfully")
-        return result
-    except Exception as e:
-        print(f"DEBUG: Direct OCR failed with error: {e}")
+        print(f"DEBUG: OCR processing failed with error: {e}")
         raise HTTPException(status_code=500, detail=f"OCR processing failed: {str(e)}")
     finally:
         # Clean up temporary file
@@ -251,6 +232,7 @@ def run_direct_ocr(image_path: str) -> Dict[str, Any]:
         
         # Extract text using manga-ocr directly
         extracted_text = manga_ocr(img_pil)
+        
         
         print(f"DEBUG: Direct OCR extracted text: '{extracted_text}'")
         
@@ -318,6 +300,8 @@ def run_ocr_detection(image_path: str, debug_image_base_path: str = None) -> Dic
                     
                     # Extract text using manga-ocr
                     line_text = manga_ocr(line_pil)
+                    
+                    
                     extracted_lines.append(line_text)
                     
                 except Exception as line_e:

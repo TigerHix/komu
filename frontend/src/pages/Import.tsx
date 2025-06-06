@@ -4,6 +4,7 @@ import { motion } from 'framer-motion'
 import { Button } from '@/components/ui/button'
 import { useToast } from '@/components/ui/use-toast'
 import { Upload, FileText, Image, CheckCircle, AlertCircle } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 
 interface UploadStatus {
   status: 'idle' | 'uploading' | 'processing' | 'success' | 'error'
@@ -20,6 +21,7 @@ export default function Import() {
   const [dragActive, setDragActive] = useState(false)
   const navigate = useNavigate()
   const { toast } = useToast()
+  const { t } = useTranslation()
 
   const handleDrag = useCallback((e: React.DragEvent) => {
     e.preventDefault()
@@ -46,8 +48,8 @@ export default function Import() {
         // For now, just upload the first one
         handleFileUpload(files[0])
         toast({
-          title: "Multiple files detected",
-          description: `Processing ${files[0].name}. Multiple file upload coming soon!`,
+          title: t('import.messages.multipleFiles'),
+          description: t('import.messages.multipleFilesDesc', { filename: files[0].name }),
         })
       }
     }
@@ -62,8 +64,8 @@ export default function Import() {
         // Handle multiple selected files
         handleFileUpload(files[0])
         toast({
-          title: "Multiple files selected",
-          description: `Processing ${files[0].name}. Multiple file upload coming soon!`,
+          title: t('import.messages.multipleSelected'),
+          description: t('import.messages.multipleFilesDesc', { filename: files[0].name }),
         })
       }
     }
@@ -76,7 +78,7 @@ export default function Import() {
     setUploadStatus({
       status: 'uploading',
       progress: 0,
-      message: 'Uploading file...'
+      message: t('import.messages.uploading')
     })
 
     try {
@@ -94,7 +96,7 @@ export default function Import() {
       setUploadStatus({
         status: 'processing',
         progress: 50,
-        message: 'Processing manga...'
+        message: t('import.messages.processing')
       })
 
       // Simulate processing time
@@ -102,12 +104,12 @@ export default function Import() {
         setUploadStatus({
           status: 'success',
           progress: 100,
-          message: 'Upload complete!'
+          message: t('import.messages.success')
         })
         
         toast({
-          title: "Upload successful",
-          description: "Your manga has been added to the library.",
+          title: t('notifications.uploadComplete'),
+          description: t('notifications.uploadComplete'),
         })
         
         // Navigate to organize pages if needed
@@ -123,34 +125,43 @@ export default function Import() {
       setUploadStatus({
         status: 'error',
         progress: 0,
-        message: 'Upload failed. Please try again.'
+        message: t('import.messages.error')
       })
       
       toast({
-        title: "Upload failed",
-        description: "There was an error uploading your file. Please try again.",
+        title: t('notifications.error.upload'),
+        description: t('notifications.error.upload'),
         variant: "destructive",
       })
     }
   }
 
   const getStatusIcon = () => {
+    const iconProps = { className: "h-8 w-8" }
     switch (uploadStatus.status) {
       case 'uploading':
       case 'processing':
-        return <motion.div
-          animate={{ rotate: 360 }}
-          transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-        >
-          <Upload className="h-8 w-8 text-accent" />
-        </motion.div>
+        return (
+          <motion.div
+            animate={{ rotate: 360 }}
+            transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+          >
+            <Upload {...iconProps} className="h-8 w-8 text-accent" />
+          </motion.div>
+        )
       case 'success':
-        return <CheckCircle className="h-8 w-8 text-accent" />
+        return <CheckCircle {...iconProps} className="h-8 w-8 text-accent" />
       case 'error':
-        return <AlertCircle className="h-8 w-8 text-destructive" />
+        return <AlertCircle {...iconProps} className="h-8 w-8 text-destructive" />
       default:
-        return <Upload className="h-8 w-8 text-text-secondary" />
+        return <Upload {...iconProps} className="h-8 w-8 text-text-secondary" />
     }
+  }
+
+  const getStatusTitle = () => {
+    const { status } = uploadStatus
+    if (status === 'idle') return dragActive ? t('import.dropzone.dragActive') : t('import.dropzone.idle')
+    return t(`import.dropzone.${status}`)
   }
 
   return (
@@ -166,9 +177,9 @@ export default function Import() {
           animate={{ opacity: 1, y: 0 }}
           className="text-center mb-8"
         >
-          <h1 className="apple-title-2 text-text-primary font-bold mb-2">Import Manga</h1>
+          <h1 className="apple-title-2 text-text-primary font-bold mb-2">{t('import.title')}</h1>
           <p className="apple-body text-text-secondary">
-            Upload your manga files to start reading
+            {t('import.subtitle')}
           </p>
         </motion.div>
 
@@ -211,22 +222,17 @@ export default function Import() {
               
               <div className="space-y-2">
                 <h3 className="apple-headline text-text-primary font-semibold">
-                  {uploadStatus.status === 'idle' && (dragActive ? 'Drop your file here' : 'Choose a file or drag it here')}
-                  {uploadStatus.status === 'uploading' && 'Uploading...'}
-                  {uploadStatus.status === 'processing' && 'Processing...'}
-                  {uploadStatus.status === 'success' && 'Upload complete!'}
-                  {uploadStatus.status === 'error' && 'Upload failed'}
+                  {getStatusTitle()}
                 </h3>
                 
                 <p className="apple-subhead text-text-secondary">
-                  {uploadStatus.status === 'idle' && 'Supports PDF files and multiple image files. JPG, PNG, GIF, WebP supported!'}
-                  {uploadStatus.status !== 'idle' && uploadStatus.message}
+                  {uploadStatus.status === 'idle' ? t('import.dropzone.description') : uploadStatus.message}
                 </p>
               </div>
               
               {uploadStatus.status === 'idle' && (
                 <Button className="mt-4">
-                  Browse Files
+                  {t('import.dropzone.browse')}
                 </Button>
               )}
             </motion.div>
@@ -263,13 +269,13 @@ export default function Import() {
           >
             <div className="bg-surface-2 rounded-2xl p-4 text-center">
               <FileText className="h-6 w-6 text-accent mx-auto mb-2" />
-              <h4 className="apple-callout font-medium text-text-primary mb-1">Documents</h4>
-              <p className="apple-caption-1 text-text-secondary">PDF files</p>
+              <h4 className="apple-callout font-medium text-text-primary mb-1">{t('import.formats.documents')}</h4>
+              <p className="apple-caption-1 text-text-secondary">{t('import.formats.documentDesc')}</p>
             </div>
             <div className="bg-surface-2 rounded-2xl p-4 text-center">
               <Image className="h-6 w-6 text-accent mx-auto mb-2" />
-              <h4 className="apple-callout font-medium text-text-primary mb-1">Images</h4>
-              <p className="apple-caption-1 text-text-secondary">JPG, PNG, GIF, WebP</p>
+              <h4 className="apple-callout font-medium text-text-primary mb-1">{t('import.formats.images')}</h4>
+              <p className="apple-caption-1 text-text-secondary">{t('import.formats.imageDesc')}</p>
             </div>
           </motion.div>
 
@@ -280,13 +286,13 @@ export default function Import() {
             transition={{ delay: 0.3 }}
             className="bg-surface-2 rounded-2xl p-6"
           >
-            <h3 className="apple-callout font-semibold text-text-primary mb-3">Tips for best results</h3>
+            <h3 className="apple-callout font-semibold text-text-primary mb-3">{t('import.tips.title')}</h3>
             <ul className="space-y-2 apple-footnote text-text-secondary">
-              <li>• High-resolution images work best for OCR text extraction</li>
-              <li>• PDF files are automatically converted to individual pages</li>
-              <li>• Multiple image files can be uploaded together</li>
-              <li>• Images will be organized in the order you upload them</li>
-              <li>• Use the organize page to reorder if needed</li>
+              <li>• {t('import.tips.tip1')}</li>
+              <li>• {t('import.tips.tip2')}</li>
+              <li>• {t('import.tips.tip3')}</li>
+              <li>• {t('import.tips.tip4')}</li>
+              <li>• {t('import.tips.tip5')}</li>
             </ul>
           </motion.div>
         </motion.div>

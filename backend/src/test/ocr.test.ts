@@ -44,9 +44,16 @@ mock.module('../lib/ocr-queue', () => ({
 }))
 
 beforeEach(() => {
-  // Mock successful inference service response
+  // Clear all mocks first
+  mockFetch.mockClear()
+  mockFs.existsSync.mockClear()
+  mockFs.readFileSync.mockClear()
+
+  // Mock successful inference service response with complete response object
   mockFetch.mockResolvedValue({
     ok: true,
+    status: 200,
+    statusText: 'OK',
     json: async () => ({
       success: true,
       textBlocks: [
@@ -63,12 +70,9 @@ beforeEach(() => {
         }
       ],
       imageSize: { width: 800, height: 600 }
-    })
+    }),
+    text: async () => 'Success response text'
   })
-
-  mockFetch.mockClear()
-  mockFs.existsSync.mockClear()
-  mockFs.readFileSync.mockClear()
 })
 
 const ocrApp = new Elysia().use(ocrRoute)
@@ -214,7 +218,10 @@ describe('OCR Routes', () => {
     it('should handle OCR service errors', async () => {
       mockFetch.mockResolvedValueOnce({
         ok: false,
-        json: async () => ({ detail: 'OCR analysis failed' })
+        status: 500,
+        statusText: 'Internal Server Error',
+        json: async () => ({ detail: 'OCR analysis failed' }),
+        text: async () => 'OCR analysis failed'
       })
 
       const imageFile = createTestImageFile('test-image.jpg')
@@ -228,6 +235,79 @@ describe('OCR Routes', () => {
       )
       
       expect(response.status).toBe(200)
+    })
+  })
+
+  describe('POST /api/ocr/analyze-image-vlm', () => {
+    it('should analyze uploaded image with VLM', async () => {
+      // Reset and setup mock for VLM
+      mockFetch.mockReset()
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        statusText: 'OK',
+        json: async () => ({
+          choices: [
+            {
+              message: {
+                content: 'テストテキスト from VLM'
+              }
+            }
+          ]
+        }),
+        text: async () => 'Success response text'
+      })
+
+      const imageFile = createTestImageFile('test-image.jpg')
+      const formData = createFormData({ file: imageFile })
+
+      const response = await ocrApp.handle(
+        new Request('http://localhost/api/ocr/analyze-image-vlm', {
+          method: 'POST',
+          body: formData
+        })
+      )
+      
+      expect(response.status).toBe(200)
+      const data = await response.json()
+      expect(data.success).toBe(true)
+      expect(data.method).toBe('vlm_gpt4o')
+      expect(data.text).toBe('テストテキスト from VLM')
+    })
+
+    it('should require image file for VLM OCR', async () => {
+      const formData = createFormData({})
+
+      const response = await ocrApp.handle(
+        new Request('http://localhost/api/ocr/analyze-image-vlm', {
+          method: 'POST',
+          body: formData
+        })
+      )
+      
+      expect(response.status).toBe(400)
+      const data = await response.json()
+      expectErrorResponse(data, 'No image file provided')
+    })
+
+    it('should handle VLM service errors', async () => {
+      // Reset and setup mock for error
+      mockFetch.mockReset()
+      mockFetch.mockRejectedValueOnce(new Error('OpenRouter API error'))
+
+      const imageFile = createTestImageFile('test-image.jpg')
+      const formData = createFormData({ file: imageFile })
+
+      const response = await ocrApp.handle(
+        new Request('http://localhost/api/ocr/analyze-image-vlm', {
+          method: 'POST',
+          body: formData
+        })
+      )
+      
+      expect(response.status).toBe(500)
+      const data = await response.json()
+      expect(data.error).toBe('OpenRouter API error')
     })
   })
 })

@@ -1,17 +1,20 @@
 import React, { useState, useRef, useCallback } from 'react'
 import { Copy, ArrowLeft, Sparkles } from 'lucide-react'
 import { Sheet, Header, Content, Footer, Portal, detents } from 'react-sheet-slide'
-import type { SheetPositionData, SheetRef } from 'react-sheet-slide'
+import type { SheetRef } from 'react-sheet-slide'
 import { Button } from '@/components/ui/button'
 import { useDarkMode } from '@/hooks/useDarkMode'
 import { motion } from 'framer-motion'
 import { useToast } from '@/components/ui/use-toast'
 import { useWordSelection } from '@/hooks/useWordSelection'
-import { GrammarToken, getSelectedText } from '@/utils/posUtils'
+import { GrammarToken } from '@/utils/grammarAnalysis'
+import { getSelectedText } from '@/utils/posUtils'
+import { copyToClipboard } from '@/utils/clipboard'
 import { SentenceDisplay } from './SentenceDisplay'
 import { TokenDetails, EmptySelection } from './TokenDetails'
 import { ExplainInterface, ExplainInterfaceRef } from './ExplainInterface'
 import { EditTextModal } from './EditTextModal'
+import { useTranslation } from 'react-i18next'
 import 'react-sheet-slide/style.css'
 
 // ChatInput component matching the design from the images
@@ -22,9 +25,10 @@ interface ChatInputProps {
   placeholder?: string
 }
 
-function ChatInput({ value, onChange, onSend, placeholder = "Message..." }: ChatInputProps) {
+function ChatInput({ value, onChange, onSend, placeholder }: ChatInputProps) {
   const [isFocused, setIsFocused] = useState(false)
   const [isTyping, setIsTyping] = useState(false)
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
   
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -38,6 +42,11 @@ function ChatInput({ value, onChange, onSend, placeholder = "Message..." }: Chat
   const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     onChange(e.target.value)
     setIsTyping(true)
+    // Auto-resize textarea
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto'
+      textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 120)}px`
+    }
     // Reset typing state after a short delay
     setTimeout(() => setIsTyping(false), 150)
   }
@@ -45,8 +54,19 @@ function ChatInput({ value, onChange, onSend, placeholder = "Message..." }: Chat
   const handleSendClick = () => {
     if (value.trim()) {
       onSend(value.trim())
+      // Reset textarea height after sending
+      if (textareaRef.current) {
+        textareaRef.current.style.height = 'auto'
+      }
     }
   }
+
+  // Reset height when value is cleared
+  React.useEffect(() => {
+    if (!value && textareaRef.current) {
+      textareaRef.current.style.height = 'auto'
+    }
+  }, [value])
 
   return (
     <div className="relative">
@@ -90,37 +110,40 @@ function ChatInput({ value, onChange, onSend, placeholder = "Message..." }: Chat
       </div>
       
       {/* Main input container - gets elevated when focused */}
-      <div className={`relative flex items-center rounded-2xl bg-gray-300 dark:bg-gray-600 transition-all duration-300 ${
+      <div className={`relative rounded-2xl bg-gray-300 dark:bg-gray-600 transition-all duration-300 ${
         isFocused 
           ? 'transform translate-y-[-4px] z-20' 
           : 'z-10'
       }`}>
-        <textarea
-          value={value}
-          onChange={handleChange}
-          onKeyDown={handleKeyDown}
-          onFocus={() => setIsFocused(true)}
-          onBlur={() => setIsFocused(false)}
-          placeholder={placeholder}
-          rows={1}
-          className="flex-1 bg-transparent px-4 py-3 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 resize-none focus:outline-none text-base"
-          style={{ 
-            minHeight: '50px', 
-            maxHeight: '120px',
-          }}
-        />
+        <div className="relative flex items-end">
+          <textarea
+            ref={textareaRef}
+            value={value}
+            onChange={handleChange}
+            onKeyDown={handleKeyDown}
+            onFocus={() => setIsFocused(true)}
+            onBlur={() => setIsFocused(false)}
+            placeholder={placeholder}
+            rows={1}
+            className="flex-1 bg-transparent px-4 py-3 pr-12 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 resize-none focus:outline-none text-base overflow-hidden"
+            style={{ 
+              minHeight: '50px', 
+              maxHeight: '120px',
+            }}
+          />
 
-        {/* Send button */}
-        <motion.button
-          whileTap={{ scale: 0.95 }}
-          onClick={handleSendClick}
-          disabled={!value.trim()}
-          className="mr-2 p-2 bg-accent text-accent-foreground rounded-xl transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-            <path d="M7 11L12 6L17 11M12 18V7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-          </svg>
-        </motion.button>
+          {/* Send button - positioned absolutely at bottom right */}
+          <motion.button
+            whileTap={{ scale: 0.95 }}
+            onClick={handleSendClick}
+            disabled={!value.trim()}
+            className="absolute bottom-2 right-2 p-2 bg-accent text-accent-foreground rounded-xl transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+              <path d="M7 11L12 6L17 11M12 18V7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          </motion.button>
+        </div>
       </div>
     </div>
   )
@@ -140,6 +163,7 @@ interface GrammarBreakdownProps {
   imageSize?: { width: number; height: number }
   onEditingStateChange?: (isEditing: boolean) => void
   onRefetchTextBlocks?: (newText: string, textBlockId?: string) => void
+  mangaId?: string
 }
 
 export function GrammarBreakdown({ 
@@ -155,9 +179,11 @@ export function GrammarBreakdown({
   imagePath, 
   imageSize, 
   onEditingStateChange, 
-  onRefetchTextBlocks 
+  onRefetchTextBlocks,
+  mangaId
 }: GrammarBreakdownProps) {
   const { toast } = useToast()
+  const { t } = useTranslation()
   const [isEditing, setIsEditing] = useState(false)
   
   // Explain feature state
@@ -214,7 +240,7 @@ export function GrammarBreakdown({
       // Multi-word selection
       selectedText = getSelectedText(selectionStart, selectionEnd, tokens)
       // Check if the selection covers all tokens (whole sentence)
-      isWholeSentence = selectionStart === 0 && selectionEnd === tokens.length
+      isWholeSentence = selectionStart === 0 && selectionEnd === tokens.length - 1
     } else if (selectedTokenIndex !== null && tokens[selectedTokenIndex]) {
       // Single word selection
       selectedText = tokens[selectedTokenIndex].word
@@ -249,7 +275,7 @@ export function GrammarBreakdown({
 
   // Handle OCR text editing
   const handleEditClick = useCallback(() => {
-    // Store current context before closing sheet
+    // Store current context before editing
     setEditingContext({
       originalText,
       textBlockId,
@@ -258,11 +284,11 @@ export function GrammarBreakdown({
       imageSize
     })
     
-    // Close the grammar breakdown sheet to avoid touch event conflicts
-    onClose()
+    // Don't close the grammar breakdown sheet, just open the edit modal
+    // The grammar breakdown sheet will be hidden via CSS when isEditing is true
     setIsEditing(true)
     onEditingStateChange?.(true) // Notify parent that editing started
-  }, [originalText, textBlockId, selectedBlock, imagePath, imageSize, onClose, onEditingStateChange])
+  }, [originalText, textBlockId, selectedBlock, imagePath, imageSize, onEditingStateChange])
 
   const handleSaveEdit = useCallback(async (editedText: string) => {
     const contextToUse = editingContext || { originalText, textBlockId, selectedBlock, imagePath, imageSize }
@@ -284,7 +310,7 @@ export function GrammarBreakdown({
       // Update the text and trigger re-analysis with new text
       onTextUpdate(editedText)
       
-      // Close editing mode and clear context
+      // Close editing mode and clear context - keep grammar breakdown open
       setIsEditing(false)
       onEditingStateChange?.(false) // Notify parent that editing ended
       setEditingContext(null) // Clear context
@@ -308,16 +334,14 @@ export function GrammarBreakdown({
   }, [onEditingStateChange])
 
   // Handle real-time sheet position changes
-  const handlePositionChange = React.useCallback((data: SheetPositionData) => {
+  const handlePositionChange = React.useCallback((data: { progress: number }) => {
     // Call expansion change callback with progress value for smooth fading
     // Pass the actual progress (0-1) instead of just boolean
-    console.log('Sheet position changed:', data)
     onSheetExpansionChange?.(data.progress)
   }, [onSheetExpansionChange])
 
   // Handle detent changes (for debugging if needed)
   const handleDetentChange = React.useCallback((detent: string) => {
-    console.log('Detent changed to:', detent)
   }, [])
 
   return (
@@ -361,7 +385,7 @@ export function GrammarBreakdown({
                 style={{ lineHeight: '2rem' }}
                 layout
               >
-                {isExplaining ? 'Chat with Komi' : 'Sentence Breakdown'}
+                {isExplaining ? t('grammarBreakdown.chatTitle') : t('grammarBreakdown.title')}
               </motion.p>
             </motion.div>
           </Header>
@@ -370,7 +394,7 @@ export function GrammarBreakdown({
             {loading ? (
               <div className="flex flex-col items-center justify-center min-h-96">
                 <div className="animate-spin rounded-full h-12 w-12 border-b-4 border-accent mb-4" />
-                <span className="text-text-secondary text-md">Analyzing...</span>
+                <span className="text-text-secondary text-md">{t('grammarBreakdown.analyzing')}</span>
               </div>
             ) : isExplaining && explainContext ? (
               <motion.div
@@ -386,6 +410,7 @@ export function GrammarBreakdown({
                   selectedText={explainContext.selectedText}
                   sentence={explainContext.sentence}
                   isWholeSentence={explainContext.isWholeSentence}
+                  mangaId={mangaId}
                 />
               </motion.div>
             ) : (
@@ -439,7 +464,7 @@ export function GrammarBreakdown({
                       setChatInputValue('')
                     }
                   }}
-                  placeholder="Try this cool text area"
+                  placeholder={t('grammarBreakdown.message')}
                 />
               </motion.div>
             ) : (
@@ -456,7 +481,7 @@ export function GrammarBreakdown({
               >
                 {/* Copy Selected Button */}
                 <Button
-                  onClick={() => {
+                  onClick={async () => {
                     let copyText = ''
                     if (getSelectionType() === 'multi') {
                       copyText = getSelectedText(selectionStart, selectionEnd, tokens)
@@ -464,21 +489,29 @@ export function GrammarBreakdown({
                       copyText = tokens[selectedTokenIndex].word
                     }
                     if (copyText) {
-                      navigator.clipboard.writeText(copyText)
-                      if (navigator.vibrate) {
-                        navigator.vibrate(50)
+                      const success = await copyToClipboard(copyText)
+                      if (success) {
+                        if (navigator.vibrate) {
+                          navigator.vibrate(50)
+                        }
+                        toast({
+                          title: t('notifications.copiedToClipboard'),
+                          description: copyText,
+                          duration: 2000,
+                        })
+                      } else {
+                        toast({
+                          title: 'Copy failed',
+                          description: 'Unable to copy text to clipboard',
+                          duration: 2000,
+                        })
                       }
-                      toast({
-                        title: "Copied to clipboard",
-                        description: copyText,
-                        duration: 2000,
-                      })
                     }
                   }}
                   className="flex-1 bg-white dark:bg-gray-600 text-black dark:text-white border-0 hover:bg-gray-50 dark:hover:bg-gray-500 flex items-center justify-center gap-2"
                 >
                   <Copy className="w-4 h-4" />
-                  Copy
+                  {t('grammarBreakdown.copy')}
                 </Button>
                 
                 {/* Search Selected Button */}
@@ -502,7 +535,7 @@ export function GrammarBreakdown({
                     <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
                     <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
                   </svg>
-                  Search
+                  {t('grammarBreakdown.search')}
                 </Button>
                 
                 {/* Explain Button */}
@@ -511,17 +544,42 @@ export function GrammarBreakdown({
                   className="flex-1 bg-white dark:bg-gray-600 text-black dark:text-white border-0 hover:bg-gray-50 dark:hover:bg-gray-500 flex items-center justify-center gap-2"
                 >
                   <Sparkles className="w-4 h-4" />
-                  Ask Komi
+                  {t('grammarBreakdown.askKomi')}
                 </Button>
               </motion.div>
             </div>
+              )}
+              
+              {/* Explain Whole Sentence Button - shown when no selection */}
+              {!hasSelection() && (
+                <div className="mb-3">
+                  <Button
+                    onClick={() => {
+                      setExplainContext({
+                        selectedText: originalText,
+                        sentence: originalText,
+                        isWholeSentence: true
+                      })
+                      setIsExplaining(true)
+                      
+                      // Set detent to large when entering explain mode
+                      if (ref.current?.setDetent) {
+                        ref.current.setDetent('large')
+                      }
+                    }}
+                    className="w-full bg-white dark:bg-gray-600 text-black dark:text-white border-0 hover:bg-gray-50 dark:hover:bg-gray-500 flex items-center justify-center gap-2"
+                  >
+                    <Sparkles className="w-4 h-4" />
+                    {t('grammarBreakdown.explainWholeSentence')}
+                  </Button>
+                </div>
               )}
               
               <Button 
                 onClick={handleClose}
                 className="w-full bg-accent hover:bg-accent/90 text-white border-0"
               >
-                Close
+                {t('grammarBreakdown.close')}
               </Button>
               </>
             )}
