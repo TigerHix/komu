@@ -36,7 +36,7 @@ Do NOT use English descriptions, summaries, or translations. Only use the authen
     console.log('📝 Making API request to OpenRouter with structured output')
     
     const completion = await openai.chat.completions.create({
-      model: "openai/gpt-4o-search-preview",
+      model: process.env.SEARCH_MODEL || "openai/gpt-4o-search-preview",
       messages: [{ role: "user", content: prompt }],
       temperature: 0.1,
       response_format: {
