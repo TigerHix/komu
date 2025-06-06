@@ -1,6 +1,9 @@
 [submodule "comic_text_detector"]
-	path = comic_text_detector
+	path = packages/comic_text_detector
 	url = https://github.com/dmMaze/comic-text-detector.git
 [submodule "ichiran"]
-	path = ichiran
+	path = packages/ichiran
 	url = https://github.com/tshatrov/ichiran.git
+[submodule "react-sheet-slide"]
+	path = packages/react-sheet-slide
+	url = https://github.com/tigerhix/react-sheet-slide.git
