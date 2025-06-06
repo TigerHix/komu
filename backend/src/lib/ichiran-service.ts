@@ -219,40 +219,115 @@ export class IchiranService {
    * Tokenize Japanese text using ichiran
    */
   async tokenize(text: string): Promise<TokenizeResponse> {
-    // Ensure ichiran is initialized and ready
-    await this.initialize()
+    const isVerbose = process.env.VERBOSE_DEBUG === 'true'
     
-    if (!await this.isContainerRunning()) {
-      throw new Error('Ichiran service failed to start or is not responding.')
-    }
-
+    if (isVerbose) console.log(`🔍 [DEBUG] Starting tokenization for text: "${text}"`)
+    
     try {
+      // Ensure ichiran is initialized and ready
+      if (isVerbose) console.log(`🔍 [DEBUG] Initializing ichiran service...`)
+      await this.initialize()
+      if (isVerbose) console.log(`🔍 [DEBUG] Ichiran service initialized successfully`)
+      
+      const containerRunning = await this.isContainerRunning()
+      if (isVerbose) console.log(`🔍 [DEBUG] Container running check result: ${containerRunning}`)
+      
+      if (!containerRunning) {
+        const error = 'Ichiran service failed to start or is not responding.'
+        console.error(`❌ [ERROR] ${error}`)
+        throw new Error(error)
+      }
+
       // Escape text for shell command
       const escapedText = text.replace(/"/g, '\\"').replace(/'/g, "\\'")
+      if (isVerbose) console.log(`🔍 [DEBUG] Escaped text: "${escapedText}"`)
       
       // Get JSON output from ichiran
-      const { stdout: jsonOutput } = await execAsync(
-        `docker exec -i ${this.containerName} ichiran-cli -f "${escapedText}"`
-      )
+      if (isVerbose) console.log(`🔍 [DEBUG] Executing ichiran JSON command...`)
+      const jsonCommand = `docker exec -i ${this.containerName} ichiran-cli -f "${escapedText}"`
+      if (isVerbose) console.log(`🔍 [DEBUG] JSON Command: ${jsonCommand}`)
+      
+      let jsonOutput: string
+      try {
+        const jsonResult = await execAsync(jsonCommand)
+        jsonOutput = jsonResult.stdout
+        if (isVerbose) console.log(`🔍 [DEBUG] JSON output received: ${jsonOutput.substring(0, 200)}...`)
+        
+        if (jsonResult.stderr) {
+          console.warn(`⚠️ [WARN] JSON command stderr: ${jsonResult.stderr}`)
+        }
+      } catch (jsonError) {
+        console.error(`❌ [ERROR] JSON command failed:`, jsonError)
+        throw new Error(`Failed to get JSON output from ichiran: ${jsonError instanceof Error ? jsonError.message : String(jsonError)}`)
+      }
 
       // Get romanized output for reference
-      const { stdout: romanizedOutput } = await execAsync(
-        `docker exec -i ${this.containerName} ichiran-cli -i "${escapedText}"`
-      )
+      if (isVerbose) console.log(`🔍 [DEBUG] Executing ichiran romanization command...`)
+      const romanizeCommand = `docker exec -i ${this.containerName} ichiran-cli -i "${escapedText}"`
+      if (isVerbose) console.log(`🔍 [DEBUG] Romanize Command: ${romanizeCommand}`)
+      
+      let romanizedOutput: string
+      try {
+        const romanizeResult = await execAsync(romanizeCommand)
+        romanizedOutput = romanizeResult.stdout
+        if (isVerbose) console.log(`🔍 [DEBUG] Romanized output received: ${romanizedOutput.substring(0, 200)}...`)
+        
+        if (romanizeResult.stderr) {
+          console.warn(`⚠️ [WARN] Romanize command stderr: ${romanizeResult.stderr}`)
+        }
+      } catch (romanizeError) {
+        console.error(`❌ [ERROR] Romanize command failed:`, romanizeError)
+        throw new Error(`Failed to get romanized output from ichiran: ${romanizeError instanceof Error ? romanizeError.message : String(romanizeError)}`)
+      }
 
       // Parse the raw JSON response
-      const rawResult: IchiranRawResult = JSON.parse(jsonOutput.trim())
+      if (isVerbose) console.log(`🔍 [DEBUG] Parsing JSON response...`)
+      let rawResult: IchiranRawResult
+      try {
+        const trimmedJson = jsonOutput.trim()
+        if (isVerbose) console.log(`🔍 [DEBUG] Trimmed JSON to parse: ${trimmedJson}`)
+        
+        if (!trimmedJson) {
+          throw new Error('Empty JSON response from ichiran')
+        }
+        
+        rawResult = JSON.parse(trimmedJson)
+        if (isVerbose) console.log(`🔍 [DEBUG] JSON parsed successfully, result type: ${typeof rawResult}, isArray: ${Array.isArray(rawResult)}`)
+      } catch (parseError) {
+        console.error(`❌ [ERROR] JSON parsing failed:`, parseError)
+        console.error(`❌ [ERROR] Raw JSON output: ${jsonOutput}`)
+        throw new Error(`Failed to parse ichiran JSON response: ${parseError instanceof Error ? parseError.message : String(parseError)}`)
+      }
       
       // Extract romanized text (first line of the romanized output)
       const romanized = romanizedOutput.split('\n')[0]?.trim() || ''
+      if (isVerbose) console.log(`🔍 [DEBUG] Extracted romanized text: "${romanized}"`)
 
       // Convert raw ichiran format to simplified tokens
-      const tokens = this.parseTokens(rawResult)
+      if (isVerbose) console.log(`🔍 [DEBUG] Starting token parsing...`)
+      let tokens: any[]
+      try {
+        tokens = this.parseTokens(rawResult)
+        if (isVerbose) console.log(`🔍 [DEBUG] Token parsing completed, found ${tokens.length} tokens`)
+      } catch (tokenParseError) {
+        console.error(`❌ [ERROR] Token parsing failed:`, tokenParseError)
+        if (isVerbose) console.error(`❌ [ERROR] Raw result for token parsing:`, JSON.stringify(rawResult, null, 2))
+        throw new Error(`Failed to parse tokens: ${tokenParseError instanceof Error ? tokenParseError.message : String(tokenParseError)}`)
+      }
 
       // Calculate total score (sum of all segmentation scores)
-      const totalScore = this.calculateTotalScore(rawResult)
+      if (isVerbose) console.log(`🔍 [DEBUG] Calculating total score...`)
+      let totalScore: number
+      try {
+        totalScore = this.calculateTotalScore(rawResult)
+        if (isVerbose) console.log(`🔍 [DEBUG] Total score calculated: ${totalScore}`)
+      } catch (scoreError) {
+        console.error(`❌ [ERROR] Score calculation failed:`, scoreError)
+        console.warn(`⚠️ [WARN] Using fallback score of 0`)
+        totalScore = 0
+      }
 
-      return {
+      const result = {
         success: true,
         original: text,
         romanized,
@@ -260,9 +335,30 @@ export class IchiranService {
         totalScore,
         raw: rawResult
       }
+      
+      if (isVerbose) console.log(`✅ [DEBUG] Tokenization completed successfully for "${text}"`)
+      return result
 
     } catch (error) {
-      console.error('Ichiran tokenization failed:', error)
+      console.error(`❌ [ERROR] Ichiran tokenization failed for text "${text}":`, error)
+      
+      // Log additional debugging info
+      if (error instanceof Error && isVerbose) {
+        console.error(`❌ [ERROR] Error name: ${error.name}`)
+        console.error(`❌ [ERROR] Error message: ${error.message}`)
+        console.error(`❌ [ERROR] Error stack: ${error.stack}`)
+      }
+      
+      // Also check container status on error
+      if (isVerbose) {
+        try {
+          const containerStatus = await this.isContainerRunning()
+          console.error(`❌ [ERROR] Container running status during error: ${containerStatus}`)
+        } catch (statusError) {
+          console.error(`❌ [ERROR] Could not check container status: ${statusError}`)
+        }
+      }
+      
       throw new Error(`Tokenization failed: ${error instanceof Error ? error.message : String(error)}`)
     }
   }
@@ -271,29 +367,55 @@ export class IchiranService {
    * Parse raw ichiran output into simplified token format
    */
   private parseTokens(rawResult: IchiranRawResult): IchiranToken[] {
+    const isVerbose = process.env.VERBOSE_DEBUG === 'true'
+    
+    if (isVerbose) {
+      console.log(`🔍 [PARSE] Starting token parsing, rawResult type: ${typeof rawResult}, isArray: ${Array.isArray(rawResult)}`)
+      console.log(`🔍 [PARSE] Raw result structure preview:`, JSON.stringify(rawResult, null, 2).substring(0, 500) + '...')
+    }
+    
     const tokens: IchiranToken[] = []
 
     try {
       // Based on actual ichiran output: [[[[["token", {info}, []], ...], score]], "punctuation"]
-      for (const outerSegmentation of rawResult) {
+      if (isVerbose) console.log(`🔍 [PARSE] Processing ${rawResult.length} outer segmentations`)
+      
+      for (let outerIndex = 0; outerIndex < rawResult.length; outerIndex++) {
+        const outerSegmentation = rawResult[outerIndex]
+        if (isVerbose) console.log(`🔍 [PARSE] Processing outer segmentation ${outerIndex}, type: ${typeof outerSegmentation}, isArray: ${Array.isArray(outerSegmentation)}`)
+        
         if (Array.isArray(outerSegmentation)) {
-          for (const segmentation of outerSegmentation) {
+          if (isVerbose) console.log(`🔍 [PARSE] Outer segmentation ${outerIndex} has ${outerSegmentation.length} segmentations`)
+          
+          for (let segIndex = 0; segIndex < outerSegmentation.length; segIndex++) {
+            const segmentation = outerSegmentation[segIndex]
+            if (isVerbose) console.log(`🔍 [PARSE] Processing segmentation ${segIndex}, type: ${typeof segmentation}, isArray: ${Array.isArray(segmentation)}, length: ${Array.isArray(segmentation) ? segmentation.length : 'N/A'}`)
+            
             if (Array.isArray(segmentation) && segmentation.length >= 1) {
               const firstElement = segmentation[0]
+              if (isVerbose) console.log(`🔍 [PARSE] First element type: ${typeof firstElement}, isArray: ${Array.isArray(firstElement)}, length: ${Array.isArray(firstElement) ? firstElement.length : 'N/A'}`)
               
               if (Array.isArray(firstElement) && firstElement.length >= 1) {
+                if (isVerbose) console.log(`🔍 [PARSE] Processing ${firstElement.length} token tuples`)
+                
                 // The firstElement itself IS the array of token tuples
-                for (const tokenTuple of firstElement) {
+                for (let tupleIndex = 0; tupleIndex < firstElement.length; tupleIndex++) {
+                  const tokenTuple = firstElement[tupleIndex]
+                  if (isVerbose) console.log(`🔍 [PARSE] Processing token tuple ${tupleIndex}, type: ${typeof tokenTuple}, isArray: ${Array.isArray(tokenTuple)}, length: ${Array.isArray(tokenTuple) ? tokenTuple.length : 'N/A'}`)
+                  
                   if (Array.isArray(tokenTuple) && tokenTuple.length >= 2) {
                     const romanized = tokenTuple[0]
                     const wordInfo = tokenTuple[1]
                     const alternatives = tokenTuple[2] || []
+                    
+                    if (isVerbose) console.log(`🔍 [PARSE] Token tuple ${tupleIndex}: romanized="${romanized}", wordInfo type: ${typeof wordInfo}, alternatives: ${Array.isArray(alternatives) ? alternatives.length : 'not array'}`)
                     
                     if (wordInfo && typeof wordInfo === 'object') {
                       // Handle words with alternatives but no direct text
                       let word = wordInfo.text
                       if (!word && wordInfo.alternative && Array.isArray(wordInfo.alternative) && wordInfo.alternative.length > 0) {
                         word = wordInfo.alternative[0].text
+                        if (isVerbose) console.log(`🔍 [PARSE] Using alternative text: "${word}"`)
                       }
                       
                       if (word) {
@@ -304,8 +426,15 @@ export class IchiranService {
                           alternatives: Array.isArray(alternatives) ? alternatives : []
                         }
                         tokens.push(token)
+                        if (isVerbose) console.log(`🔍 [PARSE] Added token: "${word}" (${romanized})`)
+                      } else if (isVerbose) {
+                        console.warn(`⚠️ [PARSE] Skipping token tuple ${tupleIndex} - no word found`)
                       }
+                    } else if (isVerbose) {
+                      console.warn(`⚠️ [PARSE] Skipping token tuple ${tupleIndex} - invalid wordInfo`)
                     }
+                  } else if (isVerbose) {
+                    console.warn(`⚠️ [PARSE] Skipping invalid token tuple ${tupleIndex}`)
                   }
                 }
               }
@@ -313,6 +442,7 @@ export class IchiranService {
           }
         } else if (typeof outerSegmentation === 'string' && outerSegmentation.trim()) {
           // Handle punctuation/ellipses that appear as strings
+          if (isVerbose) console.log(`🔍 [PARSE] Adding string token: "${outerSegmentation}"`)
           tokens.push({
             word: outerSegmentation,
             romanized: outerSegmentation,
@@ -325,11 +455,14 @@ export class IchiranService {
           })
         }
       }
+      
+      if (isVerbose) console.log(`✅ [PARSE] Token parsing completed successfully, found ${tokens.length} tokens`)
     } catch (error) {
-      console.error('Error parsing ichiran tokens:', error)
-      console.error('Raw result structure:', JSON.stringify(rawResult, null, 2))
+      console.error('❌ [PARSE ERROR] Error parsing ichiran tokens:', error)
+      if (isVerbose) console.error('❌ [PARSE ERROR] Raw result structure:', JSON.stringify(rawResult, null, 2))
       
       // Fallback: try to extract any text we can find
+      if (isVerbose) console.log('🔄 [PARSE] Attempting fallback token extraction...')
       return this.extractFallbackTokens(rawResult)
     }
 

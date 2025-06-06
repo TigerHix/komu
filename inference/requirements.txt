@@ -22,6 +22,9 @@ shapely
 # OCR dependencies
 manga-ocr>=0.1.10
 
+# comic-text-detector dependencies
+wandb
+
 # Development dependencies (optional)
 pytest>=7.0.0
 httpx>=0.25.0

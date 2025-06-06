@@ -16,10 +16,15 @@ import uvicorn
 # Add the project root to Python path so comic_text_detector can be imported
 current_dir = Path(__file__).parent.absolute()
 project_root = current_dir.parent.parent
-sys.path.insert(0, str(project_root))
+# Add the packages directory to Python path for comic_text_detector
+packages_dir = project_root / "packages"
+sys.path.insert(0, str(packages_dir))
 
 # Set the comic_text_detector path for model files
 comic_detector_path = project_root / "packages" / "comic_text_detector"
+
+# Add comic_text_detector directory to path so its internal imports work
+sys.path.insert(0, str(comic_detector_path))
 
 # Environment configuration
 GENERATE_DEBUG_IMAGES = os.getenv('GENERATE_DEBUG_IMAGES', 'true').lower() == 'true'

@@ -3,17 +3,46 @@ import { ichiranService } from '../lib/ichiran-service'
 
 export const tokenizeRoutes = new Elysia({ prefix: '/api/japanese' })
   .post('/tokenize', async ({ body }) => {
+    const isVerbose = process.env.VERBOSE_DEBUG === 'true'
+    
+    if (isVerbose) {
+      console.log('🎯 [API] Tokenize endpoint called')
+      console.log('🎯 [API] Request body:', JSON.stringify(body, null, 2))
+    }
+    
     const { text } = body
+    if (isVerbose) console.log(`🎯 [API] Extracted text: "${text}"`)
     
     if (!text || typeof text !== 'string') {
-      throw new Error('Text is required')
+      const error = 'Text is required'
+      console.error(`❌ [API ERROR] ${error}`)
+      throw new Error(error)
     }
 
     if (text.trim().length === 0) {
-      throw new Error('Text cannot be empty')
+      const error = 'Text cannot be empty'
+      console.error(`❌ [API ERROR] ${error}`)
+      throw new Error(error)
     }
 
-    return await ichiranService.tokenize(text)
+    try {
+      if (isVerbose) console.log(`🎯 [API] Calling ichiranService.tokenize for: "${text}"`)
+      const result = await ichiranService.tokenize(text)
+      if (isVerbose) console.log(`✅ [API] Tokenization successful, returning ${result.tokens?.length || 0} tokens`)
+      return result
+    } catch (error) {
+      console.error('❌ [API ERROR] Tokenization failed:', error)
+      
+      // Log detailed error information
+      if (error instanceof Error && isVerbose) {
+        console.error(`❌ [API ERROR] Error name: ${error.name}`)
+        console.error(`❌ [API ERROR] Error message: ${error.message}`)
+        console.error(`❌ [API ERROR] Error stack: ${error.stack}`)
+      }
+      
+      // Re-throw the error with more context
+      throw new Error(`API tokenization failed: ${error instanceof Error ? error.message : String(error)}`)
+    }
   }, {
     body: t.Object({
       text: t.String()

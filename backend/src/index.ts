@@ -34,6 +34,27 @@ const app = new Elysia({
   .onRequest((ctx) => {
     console.log(`${ctx.request.method} ${ctx.request.url}`)
   })
+  .onError((ctx) => {
+    const isVerbose = process.env.VERBOSE_DEBUG === 'true'
+    
+    console.error('🔥 [SERVER ERROR] Unhandled error occurred:')
+    console.error('🔥 [SERVER ERROR] Request:', `${ctx.request.method} ${ctx.request.url}`)
+    console.error('🔥 [SERVER ERROR] Error:', ctx.error)
+    
+    if (ctx.error instanceof Error && isVerbose) {
+      console.error(`🔥 [SERVER ERROR] Error name: ${ctx.error.name}`)
+      console.error(`🔥 [SERVER ERROR] Error message: ${ctx.error.message}`)
+      console.error(`🔥 [SERVER ERROR] Error stack: ${ctx.error.stack}`)
+    }
+    
+    // Return a structured error response
+    return {
+      success: false,
+      error: 'Internal Server Error',
+      message: ctx.error instanceof Error ? ctx.error.message : String(ctx.error),
+      timestamp: new Date().toISOString()
+    }
+  })
   .use(staticPlugin({
     assets: path.join(process.cwd(), 'uploads'),
     prefix: '/uploads'

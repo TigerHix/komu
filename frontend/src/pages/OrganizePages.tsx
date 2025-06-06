@@ -726,14 +726,6 @@ export default function OrganizePages() {
                    <p className="apple-footnote text-text-secondary">
                      {isMobile ? t('organize.pagesDescriptionMobile') : t('organize.pagesDescription')}
                    </p>
-                   {pages.length > 1 && (
-                     <div className="flex items-center space-x-1 text-text-tertiary">
-                       <Move className="h-3 w-3" />
-                       <span className="apple-caption-2 text-xs">
-                         {isMobile ? 'Long press to reorder' : 'Drag to reorder'}
-                       </span>
-                     </div>
-                   )}
                  </div>
               </div>
             </div>
