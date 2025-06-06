@@ -45,7 +45,17 @@
 
 1. Install Docker following the instructions on the [official website](https://docs.docker.com/engine/install/ubuntu/#install-using-the-repository).
 
-2. Run the following commands to install Git LFS, Bun, and ImageMagick.
+Start Docker:
+
+```bash
+systemctl start docker
+# or
+sudo /etc/init.d/docker start
+```
+
+2. Install Node.js 18+ following the instructions on the [official website](https://nodejs.org/en/download).
+
+3. Run the following commands to install Git LFS, Bun, and ImageMagick.
 
 ```bash
 # Install Git LFS
@@ -53,12 +63,13 @@ sudo apt install git-lfs
 
 # Install Bun
 curl -fsSL https://bun.sh/install | bash
+source ~/.bashrc
 
 # Install ImageMagick
 sudo apt install imagemagick graphicsmagick
 ```
 
-3. Clone the repository and install dependencies.
+4. Clone the repository and install dependencies.
 
 ```bash
 # Setup project (Important: --recurse-submodules to clone submodules in the packages folder!)
@@ -67,28 +78,24 @@ cd komu
 
 # Install frontend & backend dependencies
 cd frontend && bun install && cd ..
-cd backend && bun install && bunx prisma generate && bunx prisma db push && cd ..
+
+cd backend
+cp .env.example .env
+bun install && bunx prisma generate && bunx prisma db push
+cd ..
 
 # Create Python virtual environment for inference service
 # Need to create at the project root directory!
 python -m venv .venv
 source .venv/bin/activate
-cd inference && pip install -r requirements.txt && cd ..
+cd inference
+cp .env.example .env
+pip install -r requirements.txt
+cd ..
 ```
 
-4. Copy the `backend/.env.example` file to `backend/.env` and fill in the values.
+5. To use the LLM-powered features, request an API key from [OpenRouter](https://openrouter.ai/) and add it to the `backend/.env` file. You may also customize the LLM model (`CHAT_MODEL`, `SEARCH_MODEL`).
 
-```bash
-cp backend/.env.example backend/.env
-```
-
-To use the LLM-powered features, request an API key from [OpenRouter](https://openrouter.ai/) and add it to the `.env` file. You may also customize the LLM model (`CHAT_MODEL`, `SEARCH_MODEL`).
-
-5. Copy the `inference/.env.example` file to `inference/.env` and fill in the values.
-
-```bash
-cp inference/.env.example inference/.env
-```
 
 **Windows & macOS**
 
