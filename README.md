@@ -122,6 +122,10 @@ cd inference && bash ./start_service.sh
 
 ⚠️ **First-time setup note**: The initial Docker build & run for ichiran (grammar analysis service) takes approximately 5 minutes. Grammar breakdown features will become available once you see "✅ Ichiran service ready!" in the console. If the build exceeds 10 minutes, please check if the build is stuck or increase the timeout in [backend/src/lib/ichiran-service.ts](backend/src/lib/ichiran-service.ts).
 
+In your browser, go to `http://localhost:5847` to access Komu.
+
+We recommend using a VPN such as [Tailscale](https://tailscale.com/) to access the application from your other devices.
+
 ## Contributing
 
 This project was pretty much vibe-coded in a few days so beware of the code quality! We invite you to vibe together using [Claude Code](https://www.anthropic.com/claude-code). Just don't spend too much money on it...
