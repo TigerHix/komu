@@ -1,6 +1,6 @@
 #!/bin/bash
 
-echo "Starting Manga Inference Service..."
+echo "Starting Komu Inference Service..."
 echo ""
 
 # Get the directory where this script is located

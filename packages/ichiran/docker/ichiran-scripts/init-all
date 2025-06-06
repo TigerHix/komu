@@ -1,8 +1,0 @@
-#!/bin/bash
-
-if [ ! -e /root/.initialized ] ; then
-    set -e
-    init-all-force;
-    set +e
-    touch /root/.initialized;
-fi

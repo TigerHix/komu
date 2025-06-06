@@ -1,5 +1,5 @@
 @echo off
-echo Starting Manga Inference Service...
+echo Starting Komu Inference Service...
 echo.
 
 REM Get the directory where this batch file is located
@@ -27,13 +27,15 @@ pip install fastapi uvicorn python-multipart requests
 
 REM Set default environment variables if not already set
 if not defined GENERATE_DEBUG_IMAGES set GENERATE_DEBUG_IMAGES=true
+if not defined INFERENCE_PORT set INFERENCE_PORT=8847
 
 echo.
-echo Starting inference service on http://localhost:8000
-echo Health check: http://localhost:8000/health
-echo OCR endpoint: http://localhost:8000/ocr/detect
+echo Starting inference service on http://localhost:%INFERENCE_PORT%
+echo Health check: http://localhost:%INFERENCE_PORT%/health
+echo OCR endpoint: http://localhost:%INFERENCE_PORT%/ocr/detect
 echo.
 echo Environment:
+echo   INFERENCE_PORT=%INFERENCE_PORT% (default: 8847)
 echo   GENERATE_DEBUG_IMAGES=%GENERATE_DEBUG_IMAGES% (default: true)
 echo   Debug images will be saved next to original images with _debug suffix
 echo.
@@ -42,6 +44,6 @@ echo.
 
 REM Change to src directory and start the service
 cd /d "%SCRIPT_DIR%src"
-python -m uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+python -m uvicorn main:app --host 0.0.0.0 --port %INFERENCE_PORT% --reload
 
 pause

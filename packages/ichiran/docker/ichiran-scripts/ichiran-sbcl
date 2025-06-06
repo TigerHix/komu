@@ -1,2 +1,0 @@
-#!/bin/bash
-sleep 0.1 && rlwrap sbcl --core /root/ichiran.core --eval "(sb-ext:enable-debugger)"
