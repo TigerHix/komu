@@ -85,6 +85,7 @@ cd frontend && bun install && cd ..
 cd backend
 cp .env.example .env
 bun install && bunx prisma generate && bunx prisma db push
+sudo apt-get install -y poppler-utils
 cd ..
 
 # Create Python virtual environment for inference service
