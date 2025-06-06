@@ -25,7 +25,8 @@
 - **Import PDFs/Images**: Drag & drop manga PDFs/images to add to your library
 - **Dialogue OCR**: Dialogue text recognition in the background (using [manga-ocr](https://github.com/kha-white/manga-ocr))
 - **Grammar Breakdown**: Break down the dialogue into tokens with furigana and part-of-speech highlighting (using [ichiran](https://github.com/tshatrov/ichiran))
-- **AI-driven Q&A**: Select words and ask Komi to explain them in the context of the dialogue
+- **AI-driven Q&A**: Select words and ask Komi (our kanban girl) to explain them in the context of the dialogue
+- **Responsive UI**: Works on both desktop and mobile
 - **3 Reading Modes**: RTL/LTR page navigation and vertical scrolling
 - **PWA Support**: Can be added to home screen as an app on both iOS and Android
 
@@ -60,8 +61,8 @@ sudo apt install imagemagick graphicsmagick
 3. Clone the repository and install dependencies.
 
 ```bash
-# Setup project
-git clone https://github.com/TigerHix/komu.git
+# Setup project (Important: --recurse-submodules to clone submodules in the packages folder!)
+git clone --recurse-submodules https://github.com/TigerHix/komu.git
 cd komu
 
 # Install frontend & backend dependencies
