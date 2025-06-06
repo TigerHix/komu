@@ -3,7 +3,7 @@
 <div align="center">
   <img src="frontend/public/icon-512.png" alt="Komu Manga Reader" width="120" height="120" style="border-radius: 20px;">
   
-  **A kawaii self-hosted manga reader for Japanese learning!**
+  **A kawaii self-hosted manga reader for Japanese learning! Supports English and Chinese.**
   
 </div>
 
@@ -22,11 +22,11 @@
 
 ## Features
 
-- **PDF/Image Upload**: Drag & drop manga PDFs/images to add to your library
+- **Import PDFs/Images**: Drag & drop manga PDFs/images to add to your library
 - **Dialogue OCR**: Dialogue text recognition in the background (using [manga-ocr](https://github.com/kha-white/manga-ocr))
-- **Reading Modes**: RTL/LTR page navigation and vertical scrolling
 - **Grammar Breakdown**: Break down the dialogue into tokens with furigana and part-of-speech highlighting (using [ichiran](https://github.com/tshatrov/ichiran))
 - **AI-driven Q&A**: Select words and ask Komi to explain them in the context of the dialogue
+- **3 Reading Modes**: RTL/LTR page navigation and vertical scrolling
 - **PWA Support**: Can be added to home screen as an app on both iOS and Android
 
 ## Tech Stack

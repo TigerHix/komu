@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """
-Inference service for manga processing AI tasks.
-Provides HTTP API endpoints for OCR, text detection, and future AI features.
+Inference HTTP service for text detection and OCR.
 """
 
 import os
@@ -25,7 +24,7 @@ comic_detector_path = project_root / "packages" / "comic-text-detector"
 # Environment configuration
 GENERATE_DEBUG_IMAGES = os.getenv('GENERATE_DEBUG_IMAGES', 'true').lower() == 'true'
 
-print(f"🚀 Starting Manga Inference Service")
+print(f"🚀 Starting Komu Inference Service")
 print(f"📊 Configuration:")
 print(f"   - Project root: {project_root}")
 print(f"   - Comic detector path: {comic_detector_path}")
@@ -95,8 +94,6 @@ app.add_middleware(
     allow_origins=[
         f"http://localhost:{FRONTEND_PORT}",
         f"http://localhost:{BACKEND_PORT}",
-        "http://localhost:5173",  # Legacy frontend port for compatibility
-        "http://localhost:3001"   # Legacy backend port for compatibility
     ],
     allow_credentials=True,
     allow_methods=["*"],
