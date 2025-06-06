@@ -33,48 +33,182 @@ export default function Import() {
     }
   }, [])
 
+  const validateFiles = useCallback((files: File[]) => {
+    if (files.length === 0) {
+      return { valid: false, error: 'No files provided' }
+    }
+
+    const pdfFiles = files.filter(f => f.type === 'application/pdf')
+    const imageFiles = files.filter(f => f.type.startsWith('image/'))
+    const otherFiles = files.filter(f => f.type !== 'application/pdf' && !f.type.startsWith('image/'))
+
+    // Check for unsupported file types
+    if (otherFiles.length > 0) {
+      return { 
+        valid: false, 
+        error: `Unsupported file types: ${otherFiles.map(f => f.name).join(', ')}` 
+      }
+    }
+
+    // Check for mixed file types
+    if (pdfFiles.length > 0 && imageFiles.length > 0) {
+      return { 
+        valid: false, 
+        error: 'Cannot mix PDF and image files. Please upload either PDFs or images, not both.' 
+      }
+    }
+
+    // Check for multiple PDFs
+    if (pdfFiles.length > 1) {
+      return { 
+        valid: false, 
+        error: 'Multiple PDF files not supported. Please upload one PDF at a time.' 
+      }
+    }
+
+    // Must have at least one valid file
+    if (pdfFiles.length === 0 && imageFiles.length === 0) {
+      return { 
+        valid: false, 
+        error: 'No supported files found. Please upload PDF or image files.' 
+      }
+    }
+
+    return { valid: true, pdfFiles, imageFiles }
+  }, [])
+
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault()
     e.stopPropagation()
     setDragActive(false)
     
     const files = Array.from(e.dataTransfer.files)
-    if (files.length > 0) {
-      // Handle multiple files or single file
-      if (files.length === 1) {
-        handleFileUpload(files[0])
-      } else {
-        // For multiple files, we could implement batch upload
-        // For now, just upload the first one
-        handleFileUpload(files[0])
-        toast({
-          title: t('import.messages.multipleFiles'),
-          description: t('import.messages.multipleFilesDesc', { filename: files[0].name }),
-        })
-      }
+    const validation = validateFiles(files)
+    
+    if (!validation.valid) {
+      toast({
+        title: t('import.messages.invalidFiles'),
+        description: validation.error,
+        variant: "destructive",
+      })
+      return
     }
-  }, [toast])
+
+    if (validation.pdfFiles && validation.pdfFiles.length > 0) {
+      handleFileUpload(validation.pdfFiles[0])
+    } else if (validation.imageFiles && validation.imageFiles.length > 0) {
+      handleMultipleFileUpload(validation.imageFiles)
+    }
+  }, [toast, validateFiles, t, navigate])
 
   const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files
-    if (files && files.length > 0) {
-      if (files.length === 1) {
-        handleFileUpload(files[0])
-      } else {
-        // Handle multiple selected files
-        handleFileUpload(files[0])
-        toast({
-          title: t('import.messages.multipleSelected'),
-          description: t('import.messages.multipleFilesDesc', { filename: files[0].name }),
-        })
-      }
+    if (!files || files.length === 0) return
+    
+    const fileArray = Array.from(files)
+    const validation = validateFiles(fileArray)
+    
+    if (!validation.valid) {
+      toast({
+        title: t('import.messages.invalidFiles'),
+        description: validation.error,
+        variant: "destructive",
+      })
+      return
     }
-  }, [toast])
+
+    if (validation.pdfFiles && validation.pdfFiles.length > 0) {
+      handleFileUpload(validation.pdfFiles[0])
+    } else if (validation.imageFiles && validation.imageFiles.length > 0) {
+      handleMultipleFileUpload(validation.imageFiles)
+    }
+  }, [toast, validateFiles, t, navigate])
 
   const handleFileUpload = async (file: File) => {
-    const formData = new FormData()
-    formData.append('file', file)
+    // For PDFs, handle directly. For images, use the multiple file handler
+    if (file.type === 'application/pdf') {
+      setUploadStatus({
+        status: 'uploading',
+        progress: 0,
+        message: t('import.messages.uploading')
+      })
 
+      try {
+        const formData = new FormData()
+        formData.append('file', file)
+
+        const response = await fetch('/api/manga/from-pdf', {
+          method: 'POST',
+          body: formData,
+        })
+
+        if (!response.ok) {
+          throw new Error('Upload failed')
+        }
+
+        const data = await response.json()
+        
+        setUploadStatus({
+          status: 'processing',
+          progress: 50,
+          message: t('import.messages.processing')
+        })
+
+        // Simulate processing time
+        setTimeout(() => {
+          setUploadStatus({
+            status: 'success',
+            progress: 100,
+            message: t('import.messages.success')
+          })
+          
+          toast({
+            title: t('notifications.uploadComplete'),
+            description: t('notifications.uploadComplete'),
+          })
+          
+          // Navigate to metadata edit page
+          navigate(`/metadata/${data.id}`)
+        }, 2000)
+
+      } catch (error) {
+        console.error('Upload failed:', error)
+        setUploadStatus({
+          status: 'error',
+          progress: 0,
+          message: t('import.messages.error')
+        })
+        
+        toast({
+          title: t('notifications.error.upload'),
+          description: t('notifications.error.upload'),
+          variant: "destructive",
+        })
+      }
+    } else if (file.type.startsWith('image/')) {
+      // Route single images through the multiple file handler
+      handleMultipleFileUpload([file])
+    } else {
+      throw new Error('Unsupported file type')
+    }
+  }
+
+  const handleMultipleFileUpload = async (files: File[]) => {
+    // For multiple images, navigate to organize pages
+    if (files.length > 1) {
+      setUploadStatus({
+        status: 'success',
+        progress: 100,
+        message: t('import.messages.success')
+      })
+      
+      setTimeout(() => {
+        navigate('/organize', { state: { images: files } })
+      }, 500)
+      return
+    }
+
+    // For single image, upload directly
     setUploadStatus({
       status: 'uploading',
       progress: 0,
@@ -82,7 +216,14 @@ export default function Import() {
     })
 
     try {
-      const response = await fetch('/api/manga/from-pdf', {
+      const formData = new FormData()
+      
+      // Generate title from file name
+      const title = files[0].name.replace(/\.[^/.]+$/, '')
+      formData.append('title', title)
+      formData.append('pages', files[0])
+
+      const response = await fetch('/api/manga/from-images', {
         method: 'POST',
         body: formData,
       })
@@ -112,12 +253,8 @@ export default function Import() {
           description: t('notifications.uploadComplete'),
         })
         
-        // Navigate to organize pages if needed
-        if (data.needsOrganization) {
-          navigate('/organize')
-        } else {
-          navigate('/')
-        }
+        // Navigate to metadata edit page
+        navigate(`/metadata/${data.id}`)
       }, 2000)
 
     } catch (error) {

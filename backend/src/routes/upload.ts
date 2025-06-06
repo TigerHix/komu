@@ -10,13 +10,31 @@ export const uploadRoutes = new Elysia({ prefix: '/api/manga' })
     console.log('Uploading images started')
     const formData = body as any
     
+    console.log('FormData received:', {
+      title: formData.title,
+      pagesType: typeof formData.pages,
+      pagesIsArray: Array.isArray(formData.pages),
+      pagesLength: formData.pages?.length,
+      allKeys: Object.keys(formData)
+    })
+    
     if (!formData.title || typeof formData.title !== 'string') {
+      console.error('Title validation failed:', formData.title)
       throw new Error('Title is required')
     }
 
-    const pages = formData.pages
-    if (!pages || !Array.isArray(pages)) {
+    let pages = formData.pages
+    
+    // Handle both single file and array of files
+    if (!pages) {
+      console.error('Pages validation failed: no pages provided')
       throw new Error('No pages provided')
+    }
+    
+    // Convert single file to array for consistent processing
+    if (!Array.isArray(pages)) {
+      console.log('Converting single file to array')
+      pages = [pages]
     }
 
     // Filter only image files

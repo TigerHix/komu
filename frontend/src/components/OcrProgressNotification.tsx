@@ -40,7 +40,7 @@ export function OcrProgressNotification({
 
   if (isMinimized) {
     return (
-      <Card className="fixed bottom-4 right-4 w-80 shadow-lg cursor-pointer" 
+      <Card className="fixed z-[101] w-full max-w-full bottom-4 sm:bottom-20 sm:right-4 sm:w-auto sm:max-w-[420px] mx-4 sm:mx-0 shadow-lg cursor-pointer" 
             onClick={() => setIsMinimized(false)}>
         <CardContent className="p-3">
           <div className="flex items-center gap-2">
@@ -65,7 +65,7 @@ export function OcrProgressNotification({
   }
 
   return (
-    <Card className="fixed bottom-4 right-4 w-96 shadow-lg">
+    <Card className="fixed z-[101] w-full max-w-full bottom-4 sm:bottom-20 sm:right-4 sm:w-auto sm:max-w-[420px] mx-4 sm:mx-0 shadow-lg">
       <CardContent className="p-4">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">

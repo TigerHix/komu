@@ -43,7 +43,7 @@
 
 **Linux / WSL**
 
-1. Install Docker following the instructions on the [official website](https://docs.docker.com/engine/install/ubuntu/#install-using-the-repository).
+1. Install **Docker** following the instructions on the [official website](https://docs.docker.com/engine/install/ubuntu/#install-using-the-repository).
 
 Start Docker:
 
@@ -53,9 +53,11 @@ systemctl start docker
 sudo /etc/init.d/docker start
 ```
 
-2. Install Node.js 18+ following the instructions on the [official website](https://nodejs.org/en/download).
+Install **Node.js 18+** following the instructions on the [official website](https://nodejs.org/en/download).
 
-3. Run the following commands to install Git LFS, Bun, and ImageMagick.
+And finally, install **PyTorch** following the instructions on the [official website](https://pytorch.org/get-started/locally/).
+
+2. Run the following commands to install Git LFS, Bun, and ImageMagick.
 
 ```bash
 # Install Git LFS
@@ -113,14 +115,14 @@ cd frontend && bun run dev
 cd backend && bun run dev
 
 # Terminal 3: Inference Service
-cd inference && ./start_service.sh
+cd inference && bash ./start_service.sh
 ```
 
 ⚠️ **First-time setup note**: The initial Docker build & run for ichiran (grammar analysis service) takes approximately 5 minutes. Grammar breakdown features will become available once you see "✅ Ichiran service ready!" in the console. If the build exceeds 10 minutes, please check if the build is stuck or increase the timeout in [backend/src/lib/ichiran-service.ts](backend/src/lib/ichiran-service.ts).
 
 ## Contributing
 
-This project is pretty much vibe-coded in a few days so beware of the code quality! We invite you to vibe together using [Claude Code](https://www.anthropic.com/claude-code). Just don't spend too much money on it...
+This project was pretty much vibe-coded in a few days so beware of the code quality! We invite you to vibe together using [Claude Code](https://www.anthropic.com/claude-code). Just don't spend too much money on it...
 
 ## License
 

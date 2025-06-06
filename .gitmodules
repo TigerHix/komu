@@ -1,8 +1,8 @@
-[submodule "react-sheet-slide"]
+[submodule "packages/react-sheet-slide"]
 	path = packages/react-sheet-slide
 	url = https://github.com/tigerhix/react-sheet-slide.git
-[submodule "packages/comic-text-detector"]
-	path = packages/comic-text-detector
+[submodule "packages/comic_text_detector"]
+	path = packages/comic_text_detector
 	url = https://github.com/TigerHix/komu-text-detector.git
 [submodule "packages/ichiran"]
 	path = packages/ichiran

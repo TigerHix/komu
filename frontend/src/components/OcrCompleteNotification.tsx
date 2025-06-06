@@ -1,10 +1,14 @@
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { CheckCircle, AlertCircle, RotateCcw, X } from 'lucide-react'
-import { OcrQueueComplete } from '@/hooks/useWebSocket'
+interface QueueComplete {
+  totalPages: number
+  completedPages: number
+  failedPages: number
+}
 
 interface OcrCompleteNotificationProps {
-  completion: OcrQueueComplete
+  completion: QueueComplete
   onRetryFailed: () => void
   onDismiss: () => void
 }
@@ -18,7 +22,7 @@ export function OcrCompleteNotification({
   const hasFailures = failedPages > 0
 
   return (
-    <Card className="fixed bottom-4 right-4 w-80 shadow-lg border-l-4 z-50" 
+    <Card className="fixed z-[101] w-full max-w-full bottom-4 sm:bottom-20 sm:right-4 sm:w-auto sm:max-w-[420px] mx-4 sm:mx-0 shadow-lg border-l-4" 
           style={{ borderLeftColor: hasFailures ? '#ef4444' : '#22c55e' }}>
       <CardContent className="p-4">
         <div className="flex items-start justify-between">

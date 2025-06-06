@@ -121,7 +121,7 @@ async function callOpenRouterVLM(imageBuffer: Buffer, filename: string): Promise
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        model: 'openai/gpt-4o',
+        model: process.env.OCR_MODEL || 'openai/gpt-4o',
         messages: [
           {
             role: 'user',

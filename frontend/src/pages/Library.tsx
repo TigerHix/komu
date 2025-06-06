@@ -140,7 +140,7 @@ export default function Library() {
 
   const handleDismissStatus = async () => {
     try {
-      const response = await fetch('/api/ocr/completion-status/dismiss', { method: 'POST' })
+      const response = await fetch('/api/notifications/ocr-completion', { method: 'DELETE' })
       if (response.ok) {
         setOcrStatus(null)
       }
@@ -298,7 +298,7 @@ export default function Library() {
                         }
                       }, 500) // 500ms for long press
                       
-                      setLongPressTimeout(timeoutId)
+                      setLongPressTimeout(timeoutId as unknown as number)
                     }}
                     onTouchMove={(e) => {
                       // Track cumulative movement for this touch sequence
@@ -492,7 +492,7 @@ export default function Library() {
                             {item.number ? t(`metadata.types.${item.type.toLowerCase()}`, { number: item.number }) : `Unknown ${item.type}`}
                           </div>
                           <div className="apple-caption-1 text-text-tertiary line-clamp-1" lang="ja">
-                            {item.author || t('library.unknownAuthor')}
+                            {item.author || t('notifications.library.unknownAuthor')}
                           </div>
                         </div>
                         {item.totalPages > 0 && (
@@ -629,7 +629,7 @@ export default function Library() {
     if (isAnimatingCard) return
     
     setIsPressing(null)
-    setTouchData(null)
+    setTouchStartPos(null)
     setIsAnimatingCard(item.id)
     setAnimationPhase('overshoot')
     
