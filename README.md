@@ -17,7 +17,6 @@
 <img src="screenshots/mobile4.png" alt="Grammar Breakdown" width="300" style="margin: 10px; border-radius: 12px;">
 <img src="screenshots/mobile5.png" alt="Text Analysis" width="300" style="margin: 10px; border-radius: 12px;">
 <img src="screenshots/mobile6.png" alt="Settings Page" width="300" style="margin: 10px; border-radius: 12px;">
-<img src="screenshots/mobile7.png" alt="Settings Page" width="300" style="margin: 10px; border-radius: 12px;">
 
 </div>
 
