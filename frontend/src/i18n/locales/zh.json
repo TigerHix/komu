@@ -129,7 +129,8 @@
     "ocr": {
       "processing": "OCR 处理中...",
       "completed": "OCR 完成",
-      "failed": "OCR 失败"
+      "failed": "OCR 失败",
+      "progressIndicator": "OCR 处理中 {{progress}}%"
     }
   },
   "metadata": {

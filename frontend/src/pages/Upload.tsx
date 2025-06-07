@@ -2,7 +2,7 @@ import { useState, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
-import { useToast } from '@/components/ui/use-toast'
+import { toast } from 'sonner'
 import { Upload as UploadIcon, FileText, Image } from 'lucide-react'
 
 export default function Upload() {
@@ -10,15 +10,12 @@ export default function Upload() {
   const [isDraggingImages, setIsDraggingImages] = useState(false)
   const [isUploading, setIsUploading] = useState(false)
   const navigate = useNavigate()
-  const { toast } = useToast()
   const { t } = useTranslation()
 
   const uploadFile = async (file: File) => {
     if (file.type !== 'application/pdf') {
-      toast({
-        title: t('notifications.upload.invalidFileType'),
-        description: t('notifications.upload.invalidFileTypeDesc'),
-        variant: 'destructive'
+      toast.error(t('notifications.upload.invalidFileType'), {
+        description: t('notifications.upload.invalidFileTypeDesc')
       })
       return
     }
@@ -27,10 +24,8 @@ export default function Upload() {
     const maxSize = 512 * 1024 * 1024 // 512MB in bytes
     if (file.size > maxSize) {
       const size = (file.size / 1024 / 1024).toFixed(1)
-      toast({
-        title: t('notifications.upload.fileTooLarge'),
-        description: t('notifications.upload.fileTooLargeDesc', { size }),
-        variant: 'destructive'
+      toast.error(t('notifications.upload.fileTooLarge'), {
+        description: t('notifications.upload.fileTooLargeDesc', { size })
       })
       return
     }
@@ -52,17 +47,14 @@ export default function Upload() {
 
       const result = await response.json()
       
-      toast({
-        title: t('notifications.upload.uploadSuccessful'),
+      toast.success(t('notifications.upload.uploadSuccessful'), {
         description: t('notifications.upload.uploadSuccessfulDesc', { title: result.title })
       })
 
       navigate(`/metadata/${result.id}`)
     } catch (error) {
-      toast({
-        title: t('notifications.upload.uploadFailed'),
-        description: t('notifications.upload.uploadFailedDesc'),
-        variant: 'destructive'
+      toast.error(t('notifications.upload.uploadFailed'), {
+        description: t('notifications.upload.uploadFailedDesc')
       })
     } finally {
       setIsUploading(false)
@@ -87,10 +79,8 @@ export default function Upload() {
     const imageFiles = files.filter(file => file.type.startsWith('image/'))
     
     if (imageFiles.length === 0) {
-      toast({
-        title: t('notifications.upload.invalidImageType'),
-        description: t('notifications.upload.invalidImageTypeDesc'),
-        variant: 'destructive'
+      toast.error(t('notifications.upload.invalidImageType'), {
+        description: t('notifications.upload.invalidImageTypeDesc')
       })
       return
     }

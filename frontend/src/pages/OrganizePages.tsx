@@ -25,7 +25,7 @@ import {
 import { CSS } from '@dnd-kit/utilities'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { useToast } from '@/components/ui/use-toast'
+import { toast } from 'sonner'
 import { ImageCropModal } from '@/components/ImageCropModal'
 import { Trash2, Plus, Crop, ChevronLeft, Image, Move, ArrowLeft, ArrowRight, X } from 'lucide-react'
 
@@ -412,7 +412,6 @@ export default function OrganizePages() {
   const [selectedDestination, setSelectedDestination] = useState<number>(1)
   const navigate = useNavigate()
   const location = useLocation()
-  const { toast } = useToast()
   const { t } = useTranslation()
 
   // Check if device is mobile
@@ -435,10 +434,8 @@ export default function OrganizePages() {
   useEffect(() => {
     const images = location.state?.images as File[]
     if (!images || images.length === 0) {
-      toast({
-        title: t('notifications.organize.noImages'),
-        description: t('notifications.organize.noImagesDesc'),
-        variant: 'destructive'
+      toast.error(t('notifications.organize.noImages'), {
+        description: t('notifications.organize.noImagesDesc')
       })
       navigate('/import')
       return
@@ -465,12 +462,15 @@ export default function OrganizePages() {
       // Cleanup object URLs
       pageFiles.forEach(page => URL.revokeObjectURL(page.preview))
     }
-  }, [location.state, navigate, toast])
+  }, [location.state, navigate])
 
   const removePage = (index: number) => {
     const pageToRemove = pages[index]
     URL.revokeObjectURL(pageToRemove.preview)
     setPages(prev => prev.filter((_, i) => i !== index))
+    toast.error(t('notifications.organize.pageRemoved'), {
+      description: t('notifications.organize.pageRemovedDesc')
+    })
   }
 
   const movePageUp = (index: number) => {
@@ -539,8 +539,7 @@ export default function OrganizePages() {
         : page
     ))
 
-    toast({
-      title: t('notifications.organize.imageCropped'),
+    toast.success(t('notifications.organize.imageCropped'), {
       description: t('notifications.organize.imageCroppedDesc')
     })
   }
@@ -573,19 +572,15 @@ export default function OrganizePages() {
 
   const handleUpload = async () => {
     if (pages.length === 0) {
-      toast({
-        title: t('notifications.organize.noPagesToUpload'),
-        description: t('notifications.organize.noPagesToUploadDesc'),
-        variant: 'destructive'
+      toast.error(t('notifications.organize.noPagesToUpload'), {
+        description: t('notifications.organize.noPagesToUploadDesc')
       })
       return
     }
 
     if (!title.trim()) {
-      toast({
-        title: t('notifications.organize.titleRequired'),
-        description: t('notifications.organize.titleRequiredDesc'),
-        variant: 'destructive'
+      toast.error(t('notifications.organize.titleRequired'), {
+        description: t('notifications.organize.titleRequiredDesc')
       })
       return
     }
@@ -612,17 +607,14 @@ export default function OrganizePages() {
 
       const result = await response.json()
       
-      toast({
-        title: t('notifications.organize.uploadSuccessful'),
+      toast.success(t('notifications.organize.uploadSuccessful'), {
         description: t('notifications.organize.uploadSuccessfulDesc', { title: result.title })
       })
 
       navigate(`/metadata/${result.id}`)
     } catch (error) {
-      toast({
-        title: t('notifications.organize.uploadFailed'),
-        description: t('notifications.organize.uploadFailedDesc'),
-        variant: 'destructive'
+      toast.error(t('notifications.organize.uploadFailed'), {
+        description: t('notifications.organize.uploadFailedDesc')
       })
     } finally {
       setIsUploading(false)
@@ -1025,8 +1017,7 @@ export default function OrganizePages() {
                         setPages(newPages)
                         setMoveModalOpen(false)
                         setTimeout(() => setMovePageIndex(null), 250)
-                        toast({
-                          title: t('notifications.organize.pageMoved'),
+                        toast.success(t('notifications.organize.pageMoved'), {
                           description: t('notifications.organize.pageMovedDesc', { 
                             from: movePageIndex + 1, 
                             to: selectedDestination 

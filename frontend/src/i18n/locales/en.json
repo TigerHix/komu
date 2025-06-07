@@ -129,7 +129,8 @@
     "ocr": {
       "processing": "Processing OCR...",
       "completed": "OCR Complete",
-      "failed": "OCR Failed"
+      "failed": "OCR Failed",
+      "progressIndicator": "Processing OCR {{progress}}%"
     }
   },
   "metadata": {

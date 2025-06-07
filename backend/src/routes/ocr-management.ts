@@ -54,14 +54,8 @@ export const ocrManagementRoutes = new Elysia({ prefix: '/api/ocr/queue' })
 
     // Add all failed pages back to queue with high priority
     for (const page of failedPages) {
-      ocrQueue.addPage(page.id, page.mangaId, page.pageNum, page.imagePath, 'high')
+      await ocrQueue.addPage(page.id, page.mangaId, page.pageNum, page.imagePath, 'high')
     }
-
-    // Clear any existing completion status
-    await prisma.ocrCompletionStatus.updateMany({
-      where: { status: 'unread' },
-      data: { status: 'dismissed' }
-    })
 
     return { 
       success: true, 

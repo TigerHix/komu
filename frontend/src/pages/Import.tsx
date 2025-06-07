@@ -2,7 +2,7 @@ import { useState, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { Button } from '@/components/ui/button'
-import { useToast } from '@/components/ui/use-toast'
+import { toast } from 'sonner'
 import { Upload, FileText, Image, CheckCircle, AlertCircle } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
@@ -20,7 +20,6 @@ export default function Import() {
   })
   const [dragActive, setDragActive] = useState(false)
   const navigate = useNavigate()
-  const { toast } = useToast()
   const { t } = useTranslation()
 
   const handleDrag = useCallback((e: React.DragEvent) => {
@@ -86,10 +85,8 @@ export default function Import() {
     const validation = validateFiles(files)
     
     if (!validation.valid) {
-      toast({
-        title: t('import.messages.invalidFiles'),
-        description: validation.error,
-        variant: "destructive",
+      toast.error(t('import.messages.invalidFiles'), {
+        description: validation.error
       })
       return
     }
@@ -109,10 +106,8 @@ export default function Import() {
     const validation = validateFiles(fileArray)
     
     if (!validation.valid) {
-      toast({
-        title: t('import.messages.invalidFiles'),
-        description: validation.error,
-        variant: "destructive",
+      toast.error(t('import.messages.invalidFiles'), {
+        description: validation.error
       })
       return
     }
@@ -162,9 +157,8 @@ export default function Import() {
             message: t('import.messages.success')
           })
           
-          toast({
-            title: t('notifications.uploadComplete'),
-            description: t('notifications.uploadComplete'),
+          toast.success(t('notifications.uploadComplete'), {
+            description: t('notifications.uploadComplete')
           })
           
           // Navigate to metadata edit page
@@ -179,10 +173,8 @@ export default function Import() {
           message: t('import.messages.error')
         })
         
-        toast({
-          title: t('notifications.error.upload'),
-          description: t('notifications.error.upload'),
-          variant: "destructive",
+        toast.error(t('notifications.error.upload'), {
+          description: t('notifications.error.upload')
         })
       }
     } else if (file.type.startsWith('image/')) {
@@ -248,9 +240,8 @@ export default function Import() {
           message: t('import.messages.success')
         })
         
-        toast({
-          title: t('notifications.uploadComplete'),
-          description: t('notifications.uploadComplete'),
+        toast.success(t('notifications.uploadComplete'), {
+          description: t('notifications.uploadComplete')
         })
         
         // Navigate to metadata edit page
@@ -265,10 +256,8 @@ export default function Import() {
         message: t('import.messages.error')
       })
       
-      toast({
-        title: t('notifications.error.upload'),
-        description: t('notifications.error.upload'),
-        variant: "destructive",
+      toast.error(t('notifications.error.upload'), {
+        description: t('notifications.error.upload')
       })
     }
   }

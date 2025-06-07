@@ -22,10 +22,10 @@ export const pagesRoutes = new Elysia({ prefix: '/api/pages' })
     
     // If page is not yet OCR'd, prioritize it
     if (page.ocrStatus === 'PENDING') {
-      ocrQueue.addPage(page.id, page.mangaId, page.pageNum, page.imagePath, 'high')
+      await ocrQueue.addPage(page.id, page.mangaId, page.pageNum, page.imagePath, 'high')
     } else if (page.ocrStatus === 'FAILED') {
       // Also prioritize failed pages that user is viewing
-      ocrQueue.addPage(page.id, page.mangaId, page.pageNum, page.imagePath, 'high')
+      await ocrQueue.addPage(page.id, page.mangaId, page.pageNum, page.imagePath, 'high')
     }
     
     return { success: true, status: page.ocrStatus }
@@ -107,7 +107,7 @@ export const pagesRoutes = new Elysia({ prefix: '/api/pages' })
     })
     
     // Add back to queue with high priority
-    ocrQueue.addPage(page.id, page.mangaId, page.pageNum, page.imagePath, 'high')
+    await ocrQueue.addPage(page.id, page.mangaId, page.pageNum, page.imagePath, 'high')
     
     return { success: true, message: 'Page queued for retry' }
   })

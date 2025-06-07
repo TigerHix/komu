@@ -62,18 +62,6 @@ model TextBlock {
   @@map("text_blocks")
 }
 
-model OcrCompletionStatus {
-  id             String   @id @default(cuid())
-  totalPages     Int
-  completedPages Int
-  failedPages    Int
-  completedAt    DateTime
-  status         String   // 'unread' | 'dismissed'
-  createdAt      DateTime @default(now())
-  
-  @@map("ocr_completion_status")
-}
-
 enum OcrStatus {
   PENDING
   PROCESSING

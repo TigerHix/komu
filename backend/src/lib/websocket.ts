@@ -1,4 +1,4 @@
-import { ocrQueue, OcrProgress } from './ocr-queue'
+import { ocrQueue, OcrProgress, MangaOcrProgress } from './ocr-queue'
 
 export class WebSocketManager {
   private clients = new Set<any>()
@@ -9,6 +9,14 @@ export class WebSocketManager {
       this.broadcast({
         type: 'ocr-progress',
         data: progress
+      })
+    })
+    
+    // Listen to per-manga OCR progress updates
+    ocrQueue.on('manga-progress', (mangaProgress: MangaOcrProgress[]) => {
+      this.broadcast({
+        type: 'manga-ocr-progress',
+        data: mangaProgress
       })
     })
   }
@@ -22,6 +30,13 @@ export class WebSocketManager {
     this.sendToClient(ws, {
       type: 'ocr-progress',
       data: progress
+    })
+    
+    // Send current manga progress immediately
+    const mangaProgress = ocrQueue.getMangaProgress()
+    this.sendToClient(ws, {
+      type: 'manga-ocr-progress',
+      data: mangaProgress
     })
   }
 

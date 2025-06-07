@@ -5,7 +5,7 @@ import type { SheetRef } from 'react-sheet-slide'
 import { Button } from '@/components/ui/button'
 import { useDarkMode } from '@/hooks/useDarkMode'
 import { motion } from 'framer-motion'
-import { useToast } from '@/components/ui/use-toast'
+import { toast } from 'sonner'
 import { useWordSelection } from '@/hooks/useWordSelection'
 import { GrammarToken } from '@/utils/grammarAnalysis'
 import { getSelectedText } from '@/utils/posUtils'
@@ -182,7 +182,6 @@ export function GrammarBreakdown({
   onRefetchTextBlocks,
   mangaId
 }: GrammarBreakdownProps) {
-  const { toast } = useToast()
   const { t } = useTranslation()
   const [isEditing, setIsEditing] = useState(false)
   
@@ -494,14 +493,12 @@ export function GrammarBreakdown({
                         if (navigator.vibrate) {
                           navigator.vibrate(50)
                         }
-                        toast({
-                          title: t('notifications.copiedToClipboard'),
+                        toast.success(t('notifications.copiedToClipboard'), {
                           description: copyText,
                           duration: 2000,
                         })
                       } else {
-                        toast({
-                          title: 'Copy failed',
+                        toast.error('Copy failed', {
                           description: 'Unable to copy text to clipboard',
                           duration: 2000,
                         })

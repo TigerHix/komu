@@ -88,7 +88,7 @@ export const uploadRoutes = new Elysia({ prefix: '/api/manga' })
 
       // Queue all pages for OCR processing
       for (const page of manga.pages) {
-        ocrQueue.addPage(page.id, page.mangaId, page.pageNum, page.imagePath, 'normal')
+        await ocrQueue.addPage(page.id, page.mangaId, page.pageNum, page.imagePath, 'normal')
       }
 
       return {
@@ -160,7 +160,7 @@ export const uploadRoutes = new Elysia({ prefix: '/api/manga' })
 
       // Queue all pages for OCR processing
       for (const page of manga.pages) {
-        ocrQueue.addPage(page.id, page.mangaId, page.pageNum, page.imagePath, 'normal')
+        await ocrQueue.addPage(page.id, page.mangaId, page.pageNum, page.imagePath, 'normal')
       }
 
       return {

@@ -130,7 +130,7 @@ export const mangaRoutes = new Elysia({ prefix: '/api' })
     })
 
     for (const page of allPages) {
-      ocrQueue.addPage(page.id, page.mangaId, page.pageNum, page.imagePath, 'normal')
+      await ocrQueue.addPage(page.id, page.mangaId, page.pageNum, page.imagePath, 'normal')
     }
 
     return { 

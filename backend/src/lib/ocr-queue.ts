@@ -23,6 +23,13 @@ export interface OcrProgress {
   isPaused: boolean
 }
 
+export interface MangaOcrProgress {
+  mangaId: string
+  totalPages: number
+  processedPages: number
+  isProcessing: boolean
+}
+
 export interface TextBlockData {
   bbox: [number, number, number, number]
   width: number
@@ -58,6 +65,9 @@ class OcrQueueManager extends EventEmitter {
   private processingStartTime?: Date
   private processedCount = 0
   private totalCount = 0
+  
+  // Track per-manga progress
+  private mangaProgress = new Map<string, MangaOcrProgress>()
 
   constructor() {
     super()
@@ -93,10 +103,11 @@ class OcrQueueManager extends EventEmitter {
 
     this.totalCount = this.queue.length
     this.processedCount = 0
+    await this.updateMangaProgress()
     this.emitProgress()
   }
 
-  addPage(pageId: string, mangaId: string, pageNum: number, imagePath: string, priority: 'normal' | 'high' = 'normal') {
+  async addPage(pageId: string, mangaId: string, pageNum: number, imagePath: string, priority: 'normal' | 'high' = 'normal') {
     const existingIndex = this.queue.findIndex(item => item.pageId === pageId)
     
     if (existingIndex !== -1) {
@@ -125,6 +136,7 @@ class OcrQueueManager extends EventEmitter {
     }
 
     this.totalCount++
+    await this.updateMangaProgress()
     this.emitProgress()
     
     if (!this.isProcessing && !this.isPaused) {
@@ -169,6 +181,7 @@ class OcrQueueManager extends EventEmitter {
       while (this.queue.length > 0 && !this.isPaused) {
         const item = this.queue.shift()!
         this.currentProcessing = item
+        await this.updateMangaProgress()
         this.emitProgress()
 
         try {
@@ -180,11 +193,13 @@ class OcrQueueManager extends EventEmitter {
         }
 
         this.currentProcessing = null
+        await this.updateMangaProgress()
         this.emitProgress()
       }
     } finally {
       this.isProcessing = false
       this.currentProcessing = null
+      await this.updateMangaProgress()
       this.emitProgress()
       
       // Check if queue is completely finished and broadcast completion
@@ -312,17 +327,6 @@ class OcrQueueManager extends EventEmitter {
         
         // Only broadcast if there were actually pages processed
         if (totalPages > 0) {
-          // Create persistent completion status
-          await prisma.ocrCompletionStatus.create({
-            data: {
-              totalPages,
-              completedPages,
-              failedPages,
-              completedAt: new Date(),
-              status: 'unread'
-            }
-          })
-
           // Send real-time notification
           wsManager.broadcastQueueComplete({
             totalPages,
@@ -331,6 +335,63 @@ class OcrQueueManager extends EventEmitter {
           })
         }
       }
+    }
+  }
+
+  private async updateMangaProgress() {
+    // Clear previous progress
+    this.mangaProgress.clear()
+    
+    // Calculate accurate progress from database
+    await this.calculateMangaProgressFromDB()
+  }
+  
+  private async calculateMangaProgressFromDB() {
+    try {
+      // Get all manga that have pending or processing pages
+      const mangaWithOcrPages = await prisma.manga.findMany({
+        where: {
+          pages: {
+            some: {
+              ocrStatus: {
+                in: ['PENDING', 'PROCESSING']
+              }
+            }
+          }
+        },
+        select: {
+          id: true,
+          _count: {
+            select: {
+              pages: true
+            }
+          },
+          pages: {
+            select: {
+              ocrStatus: true
+            }
+          }
+        }
+      })
+      
+      for (const manga of mangaWithOcrPages) {
+        const totalPages = manga._count.pages
+        const completedPages = manga.pages.filter(p => p.ocrStatus === 'COMPLETED').length
+        const pendingPages = manga.pages.filter(p => p.ocrStatus === 'PENDING').length
+        const processingPages = manga.pages.filter(p => p.ocrStatus === 'PROCESSING').length
+        
+        // Only track manga that still have OCR work to do
+        if (pendingPages > 0 || processingPages > 0) {
+          this.mangaProgress.set(manga.id, {
+            mangaId: manga.id,
+            totalPages,
+            processedPages: completedPages,
+            isProcessing: processingPages > 0 || (this.currentProcessing?.mangaId === manga.id)
+          })
+        }
+      }
+    } catch (error) {
+      console.error('Error calculating manga progress:', error)
     }
   }
 
@@ -356,6 +417,9 @@ class OcrQueueManager extends EventEmitter {
     }
 
     this.emit('progress', progress)
+    
+    // Also emit per-manga progress
+    this.emit('manga-progress', Array.from(this.mangaProgress.values()))
   }
 
   getProgress(): OcrProgress {
@@ -379,6 +443,10 @@ class OcrQueueManager extends EventEmitter {
     }
 
     return progress
+  }
+
+  getMangaProgress(): MangaOcrProgress[] {
+    return Array.from(this.mangaProgress.values())
   }
 
   setConcurrency(concurrency: number) {

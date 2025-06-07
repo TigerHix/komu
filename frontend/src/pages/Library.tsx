@@ -4,10 +4,10 @@ import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
-import { OcrStatusBlock } from '@/components/OcrStatusBlock'
 import { MangaCoverTransition } from '@/components/PageTransition'
-import { useToast } from '@/components/ui/use-toast'
-import { Plus, Book, Edit, Trash2, TestTube } from 'lucide-react'
+import { useWebSocket, MangaOcrProgress } from '@/hooks/useWebSocket'
+import { toast } from 'sonner'
+import { Plus, Book, Edit, Trash2, TestTube, Loader2, RotateCcw } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 interface MangaItem {
@@ -23,19 +23,26 @@ interface MangaItem {
   createdAt: string
 }
 
-interface OcrCompletionStatus {
-  id: string
-  totalPages: number
-  completedPages: number
-  failedPages: number
-  completedAt: string
-  status: string
+// OCR Progress Indicator Component
+interface OcrProgressIndicatorProps {
+  progress: number
+  isProcessing: boolean
+}
+
+function OcrProgressIndicator({ progress, isProcessing }: OcrProgressIndicatorProps) {
+  const { t } = useTranslation()
+  
+  return (
+    <div className="absolute top-3 left-3 bg-black/80 backdrop-blur-sm text-white px-3 py-1.5 rounded-xl apple-caption-2 font-bold shadow-sm flex items-center justify-center gap-2 z-10">
+      <Loader2 className="h-3 w-3 animate-spin flex-shrink-0" />
+      <span className="leading-none">{t('reader.ocr.progressIndicator', { progress })}</span>
+    </div>
+  )
 }
 
 export default function Library() {
   const [manga, setManga] = useState<MangaItem[]>([])
   const [loading, setLoading] = useState(true)
-  const [ocrStatus, setOcrStatus] = useState<OcrCompletionStatus | null>(null)
   const [showCoverTransition, setShowCoverTransition] = useState(false)
   const [selectedCover, setSelectedCover] = useState<string | undefined>()
   const [pendingNavigation, setPendingNavigation] = useState<string | null>(null)
@@ -49,16 +56,55 @@ export default function Library() {
   const [touchStartPos, setTouchStartPos] = useState<{ x: number; y: number } | null>(null)
   const [maxMovement, setMaxMovement] = useState<{ [key: string]: number }>({})
   const buttonContainerRef = useRef<HTMLDivElement>(null)
-  const { toast } = useToast()
+  const [filteredManga, setFilteredManga] = useState<MangaItem[]>([])
+  const [searchQuery, setSearchQuery] = useState('')
   const navigate = useNavigate()
   const location = useLocation()
   const { t } = useTranslation()
+  
+  // WebSocket for OCR progress
+  const { mangaProgress, queueComplete, clearQueueComplete } = useWebSocket(
+    `ws://localhost:${import.meta.env.VITE_BACKEND_PORT || '3847'}/ws`
+  )
+
+  // Debug state for simulating OCR progress
+  const [debugProgress, setDebugProgress] = useState<Record<string, MangaOcrProgress>>({})
+  const [isDebugging, setIsDebugging] = useState(false)
 
   useEffect(() => {
     fetchManga()
-    fetchOcrCompletionStatus()
   }, [])
 
+  // Handle OCR queue completion - show toast only for failures
+  useEffect(() => {
+    if (queueComplete && queueComplete.failedPages > 0) {
+      toast.error(`OCR completed with ${queueComplete.failedPages} failed pages`, {
+        description: `${queueComplete.completedPages} pages completed successfully`,
+        action: {
+          label: 'Retry Failed',
+          onClick: async () => {
+            try {
+              const response = await fetch('/api/ocr/queue/retry-failed', { method: 'POST' })
+              if (response.ok) {
+                toast.success('Failed pages queued for retry')
+              } else {
+                toast.error('Failed to retry pages')
+              }
+            } catch (error) {
+              console.error('Error retrying failed pages:', error)
+              toast.error('Failed to retry pages')
+            }
+          }
+        },
+        duration: Infinity, // Show for 10 seconds
+      })
+      // Clear the completion status regardless of user action
+      clearQueueComplete()
+    } else if (queueComplete && queueComplete.failedPages === 0) {
+      // Just clear successful completions without showing anything
+      clearQueueComplete()
+    }
+  }, [queueComplete, clearQueueComplete])
 
   // Dismiss long press mode when clicking outside
   useEffect(() => {
@@ -108,47 +154,6 @@ export default function Library() {
     }
   }
 
-  const fetchOcrCompletionStatus = async () => {
-    try {
-      const response = await fetch('/api/notifications/ocr-completion')
-      if (response.ok) {
-        const text = await response.text()
-        if (text) {
-          const data = JSON.parse(text)
-          setOcrStatus(data)
-        } else {
-          setOcrStatus(null)
-        }
-      }
-    } catch (error) {
-      console.error('Error fetching OCR completion status:', error)
-    }
-  }
-
-  const handleRetryFailed = async () => {
-    try {
-      const response = await fetch('/api/ocr/queue/retry-failed', { method: 'POST' })
-      if (response.ok) {
-        // Clear the status and refresh
-        setOcrStatus(null)
-        await fetch('/api/notifications/ocr-completion', { method: 'DELETE' })
-      }
-    } catch (error) {
-      console.error('Error retrying failed pages:', error)
-    }
-  }
-
-  const handleDismissStatus = async () => {
-    try {
-      const response = await fetch('/api/notifications/ocr-completion', { method: 'DELETE' })
-      if (response.ok) {
-        setOcrStatus(null)
-      }
-    } catch (error) {
-      console.error('Error dismissing status:', error)
-    }
-  }
-
   const deleteManga = async (id: string, title: string) => {
     if (!confirm(t('notifications.library.deleteConfirm', { title }))) {
       return
@@ -169,6 +174,9 @@ export default function Library() {
       alert(t('notifications.library.deleteFailed'))
     }
   }
+
+  // Combine real progress with debug progress (debug takes precedence)
+  const combinedProgress = { ...mangaProgress, ...debugProgress }
 
   if (loading) {
     return (
@@ -196,14 +204,6 @@ export default function Library() {
             komu
           </motion.h1>
         </div>
-        {/* OCR Completion Status Block */}
-        {ocrStatus && (
-          <OcrStatusBlock
-            status={ocrStatus}
-            onRetry={handleRetryFailed}
-            onDismiss={handleDismissStatus}
-          />
-        )}
 
         <AnimatePresence mode="wait">
           {manga.length === 0 ? (
@@ -480,6 +480,14 @@ export default function Library() {
                           )}
                         </div>
                         <div className="absolute inset-0 bg-gradient-to-t from-black/20 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                        
+                        {/* OCR Progress Indicator */}
+                        {combinedProgress[item.id] && (
+                          <OcrProgressIndicator
+                            progress={Math.round((combinedProgress[item.id].processedPages / combinedProgress[item.id].totalPages) * 100)}
+                            isProcessing={combinedProgress[item.id].isProcessing}
+                          />
+                        )}
                       </div>
                     
                       {/* Title and info area */}
@@ -624,30 +632,4 @@ export default function Library() {
       />
     </div>
   )
-
-  const handleCardTap = (item: MangaItem) => {
-    if (isAnimatingCard) return
-    
-    setIsPressing(null)
-    setTouchStartPos(null)
-    setIsAnimatingCard(item.id)
-    setAnimationPhase('overshoot')
-    
-    setTimeout(() => {
-      setAnimationPhase('idle')
-      
-      setTimeout(() => {
-        if (item.thumbnail) {
-          setSelectedCover(item.thumbnail)
-          setPendingNavigation(`/reader/${item.id}`)
-          setShowCoverTransition(true)
-        } else {
-          navigate(`/reader/${item.id}`)
-        }
-        
-        setIsAnimatingCard(null)
-        setAnimationPhase('idle')
-      }, 150)
-    }, 150)
-  }
 }

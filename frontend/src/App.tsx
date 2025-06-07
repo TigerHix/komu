@@ -1,10 +1,7 @@
 import { useState, useEffect } from 'react'
 import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom'
-import { Toaster } from '@/components/ui/toaster'
-import { OcrProgressNotification } from '@/components/OcrProgressNotification'
-import { OcrCompleteNotification } from '@/components/OcrCompleteNotification'
+import { Toaster } from '@/components/ui/sonner'
 import { BottomTabs } from '@/components/BottomTabs'
-import { useWebSocket } from '@/hooks/useWebSocket'
 import { useDarkMode } from '@/hooks/useDarkMode'
 import Library from '@/pages/Library'
 import Import from '@/pages/Import'
@@ -17,13 +14,9 @@ import './App.css'
 
 function AppContent() {
   const location = useLocation()
-  const [showOcrProgress, setShowOcrProgress] = useState(true)
-  const { ocrProgress, queueComplete, pauseOcr, resumeOcr, clearQueueComplete } = useWebSocket(
-    `ws://localhost:${import.meta.env.VITE_BACKEND_PORT || '3847'}/ws`
-  )
   
   // Initialize dark mode at app level
-  useDarkMode()
+  const { isDarkMode } = useDarkMode()
 
   // Reset scroll position when route changes (only for reader pages that need it)
   useEffect(() => {
@@ -41,25 +34,6 @@ function AppContent() {
     }
   }, [location.pathname])
 
-  // Only show OCR progress outside of reader page
-  const isReaderPage = location.pathname.startsWith('/reader/')
-  const shouldShowProgress = !isReaderPage && 
-    showOcrProgress && 
-    ocrProgress && 
-    ocrProgress.isProcessing
-
-  const handleRetryFailed = async () => {
-    try {
-      const response = await fetch('/api/ocr/queue/retry-failed', { method: 'POST' })
-      if (!response.ok) {
-        throw new Error('Failed to retry failed pages')
-      }
-      clearQueueComplete()
-    } catch (error) {
-      console.error('Error retrying failed pages:', error)
-    }
-  }
-
   return (
     <div className="min-h-screen bg-background">
       <Routes>
@@ -73,25 +47,7 @@ function AppContent() {
         <Route path="/reader/:id/:page" element={<Reader />} />
       </Routes>
       <BottomTabs />
-      <Toaster />
-      
-      {shouldShowProgress && (
-        <OcrProgressNotification
-          progress={ocrProgress}
-          onPause={pauseOcr}
-          onResume={resumeOcr}
-          onDismiss={() => setShowOcrProgress(false)}
-        />
-      )}
-      
-      {queueComplete && (
-        <OcrCompleteNotification
-          completion={queueComplete}
-          onRetryFailed={handleRetryFailed}
-          onDismiss={clearQueueComplete}
-        />
-      )}
-      
+      <Toaster position="top-center" richColors theme={isDarkMode ? 'dark' : 'light'} />
     </div>
   )
 }

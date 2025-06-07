@@ -54,15 +54,8 @@ export async function checkAndCleanIncompleteOcrData() {
         }
       })
 
-      // Clear old completion statuses since we're auto-retrying
-      await prisma.ocrCompletionStatus.updateMany({
-        where: { status: 'unread' },
-        data: { status: 'dismissed' }
-      })
-      
       totalReset += failedPages.length
       console.log(`   Reset ${failedPages.length} FAILED pages to PENDING for retry`)
-      console.log(`   Cleared old completion notifications`)
     }
 
     // 3. Find pages that are marked as COMPLETED but missing image dimensions

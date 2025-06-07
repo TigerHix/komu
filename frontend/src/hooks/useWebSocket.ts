@@ -10,17 +10,23 @@ export interface OcrProgress {
   isPaused: boolean
 }
 
-interface QueueComplete {
+export interface MangaOcrProgress {
   mangaId: string
   totalPages: number
-  successfulPages: number
+  processedPages: number
+  isProcessing: boolean
+}
+
+interface QueueComplete {
+  totalPages: number
+  completedPages: number
   failedPages: number
-  hasFailures: boolean
 }
 
 interface UseWebSocketReturn {
   ocrProgress: OcrProgress | null
   queueComplete: QueueComplete | null
+  mangaProgress: Record<string, MangaOcrProgress>
   pauseOcr: () => void
   resumeOcr: () => void
   clearQueueComplete: () => void
@@ -29,6 +35,7 @@ interface UseWebSocketReturn {
 export function useWebSocket(url: string): UseWebSocketReturn {
   const [ocrProgress, setOcrProgress] = useState<OcrProgress | null>(null)
   const [queueComplete, setQueueComplete] = useState<QueueComplete | null>(null)
+  const [mangaProgress, setMangaProgress] = useState<Record<string, MangaOcrProgress>>({})
   const wsRef = useRef<WebSocket | null>(null)
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
@@ -52,10 +59,20 @@ export function useWebSocket(url: string): UseWebSocketReturn {
           if (data.type === 'ocr-progress') {
             console.log('🔄 OCR Progress update:', data.data)
             setOcrProgress(data.data)
+          } else if (data.type === 'manga-ocr-progress') {
+            console.log('📚 Manga OCR Progress update:', data.data)
+            // Convert array to record for easier lookup
+            const progressRecord: Record<string, MangaOcrProgress> = {}
+            data.data.forEach((progress: MangaOcrProgress) => {
+              progressRecord[progress.mangaId] = progress
+            })
+            setMangaProgress(progressRecord)
           } else if (data.type === 'ocr-queue-complete') {
             console.log('✅ Queue complete:', data.data)
             setQueueComplete(data.data)
             setOcrProgress(null)
+            // Clear manga progress when queue is complete
+            setMangaProgress({})
           }
         } catch (error) {
           console.error('Error parsing WebSocket message:', error)
@@ -114,6 +131,7 @@ export function useWebSocket(url: string): UseWebSocketReturn {
   return {
     ocrProgress,
     queueComplete,
+    mangaProgress,
     pauseOcr,
     resumeOcr,
     clearQueueComplete

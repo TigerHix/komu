@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { useToast } from '@/components/ui/use-toast'
+import { toast } from 'sonner'
 import { Loader2, Upload, Check, X, Sparkles, Trash2, ChevronLeft, User, FileText, Image as ImageIcon, Bot } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
@@ -29,7 +29,6 @@ interface MetadataSuggestion {
 export default function MetadataEdit() {
   const { id } = useParams()
   const navigate = useNavigate()
-  const { toast } = useToast()
   const { t } = useTranslation()
   
   const [metadata, setMetadata] = useState<Metadata | null>(null)
@@ -65,8 +64,7 @@ export default function MetadataEdit() {
     
     setFetchingSuggestions(true)
     
-    toast({
-      title: t('notifications.metadata.fetching'),
+    toast(t('notifications.metadata.fetching'), {
       description: t('notifications.metadata.fetchingDesc')
     })
     
@@ -87,23 +85,19 @@ export default function MetadataEdit() {
         if (data.author || data.description) {
           setSuggestions(data)
           setShowSuggestions(true)
-          toast({
-            title: t('notifications.metadata.suggestionsAvailable'),
+          toast.success(t('notifications.metadata.suggestionsAvailable'), {
             description: t('notifications.metadata.suggestionsAvailableDesc')
           })
         } else {
-          toast({
-            title: t('notifications.metadata.noSuggestions'),
+          toast(t('notifications.metadata.noSuggestions'), {
             description: t('notifications.metadata.noSuggestionsDesc')
           })
         }
       }
     } catch (error) {
       console.error('Error fetching suggestions:', error)
-      toast({
-        title: t('notifications.metadata.fetchFailed'),
-        description: t('notifications.metadata.fetchFailedDesc'),
-        variant: 'destructive'
+      toast.error(t('notifications.metadata.fetchFailed'), {
+        description: t('notifications.metadata.fetchFailedDesc')
       })
     } finally {
       setFetchingSuggestions(false)
@@ -118,8 +112,7 @@ export default function MetadataEdit() {
         description: suggestions.description || metadata.description
       })
       setShowSuggestions(false)
-      toast({
-        title: t('notifications.metadata.suggestionsApplied'),
+      toast.success(t('notifications.metadata.suggestionsApplied'), {
         description: t('notifications.metadata.suggestionsAppliedDesc')
       })
     }
@@ -144,8 +137,7 @@ export default function MetadataEdit() {
 
       if (response.ok) {
         const data = await response.json()
-        toast({
-          title: t('notifications.metadata.ocrRemoved'),
+        toast.success(t('notifications.metadata.ocrRemoved'), {
           description: data.message
         })
       } else {
@@ -153,10 +145,8 @@ export default function MetadataEdit() {
       }
     } catch (error) {
       console.error('Error removing OCR data:', error)
-      toast({
-        title: t('notifications.metadata.ocrRemoveFailed'),
-        description: t('notifications.metadata.ocrRemoveFailedDesc'),
-        variant: 'destructive'
+      toast.error(t('notifications.metadata.ocrRemoveFailed'), {
+        description: t('notifications.metadata.ocrRemoveFailedDesc')
       })
     } finally {
       setRemovingOcr(false)
@@ -192,8 +182,7 @@ export default function MetadataEdit() {
       })
 
       if (response.ok) {
-        toast({
-          title: t('notifications.metadata.saved'),
+        toast.success(t('notifications.metadata.saved'), {
           description: t('notifications.metadata.savedDesc')
         })
         navigate('/')
@@ -201,10 +190,8 @@ export default function MetadataEdit() {
         throw new Error('Failed to save')
       }
     } catch (error) {
-      toast({
-        title: t('notifications.metadata.saveFailed'),
-        description: t('notifications.metadata.saveFailedDesc'),
-        variant: 'destructive'
+      toast.error(t('notifications.metadata.saveFailed'), {
+        description: t('notifications.metadata.saveFailedDesc')
       })
     } finally {
       setSaving(false)
@@ -224,16 +211,13 @@ export default function MetadataEdit() {
       if (response.ok) {
         const data = await response.json()
         setMetadata(prev => prev ? { ...prev, thumbnail: data.thumbnail } : null)
-        toast({
-          title: t('notifications.metadata.thumbnailUpdated'),
+        toast.success(t('notifications.metadata.thumbnailUpdated'), {
           description: t('notifications.metadata.thumbnailUpdatedDesc')
         })
       }
     } catch (error) {
-      toast({
-        title: t('notifications.metadata.uploadFailed'),
-        description: t('notifications.metadata.uploadFailedDesc'),
-        variant: 'destructive'
+      toast.error(t('notifications.metadata.uploadFailed'), {
+        description: t('notifications.metadata.uploadFailedDesc')
       })
     }
   }

@@ -26,7 +26,6 @@ export async function cleanupDatabase() {
   await prisma.textBlock.deleteMany({})
   await prisma.page.deleteMany({})
   await prisma.manga.deleteMany({})
-  await prisma.ocrCompletionStatus.deleteMany({})
 }
 
 // Test data factories

@@ -8,7 +8,7 @@ import { mangaRoutes } from './routes/manga'
 import { metadataRoutes } from './routes/metadata'
 import { ocrRoute } from './routes/ocr'
 import { ocrManagementRoutes } from './routes/ocr-management'
-import { ocrCompletionRoutes } from './routes/ocr-completion'
+
 import { pagesRoutes } from './routes/pages'
 import { tokenizeRoutes } from './routes/tokenize'
 import { textBlocksRoutes } from './routes/text-blocks'
@@ -64,7 +64,6 @@ const app = new Elysia({
   .use(metadataRoutes)
   .use(ocrRoute)
   .use(ocrManagementRoutes)
-  .use(ocrCompletionRoutes)
   .use(pagesRoutes)
   .use(tokenizeRoutes)
   .use(textBlocksRoutes)

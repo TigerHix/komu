@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, mock } from 'bun:test'
 import { Elysia } from 'elysia'
 import { ocrRoute } from '../routes/ocr'
 import { ocrManagementRoutes } from '../routes/ocr-management'
-import { ocrCompletionRoutes } from '../routes/ocr-completion'
+
 import { 
   setupTestDatabase, 
   teardownTestDatabase, 
@@ -77,7 +77,6 @@ beforeEach(() => {
 
 const ocrApp = new Elysia().use(ocrRoute)
 const managementApp = new Elysia().use(ocrManagementRoutes)
-const completionApp = new Elysia().use(ocrCompletionRoutes)
 
 describe('OCR Routes', () => {
   beforeEach(async () => {
@@ -473,103 +472,3 @@ describe('OCR Queue Management Routes', () => {
   })
 })
 
-describe('OCR Completion Notification Routes', () => {
-  beforeEach(async () => {
-    await setupTestDatabase()
-  })
-
-  afterEach(async () => {
-    await teardownTestDatabase()
-  })
-
-  describe('GET /api/notifications/ocr-completion', () => {
-    it('should return latest unread completion status', async () => {
-      // Create test completion status
-      await prisma.ocrCompletionStatus.create({
-        data: {
-          totalPages: 10,
-          completedPages: 5,
-          failedPages: 1,
-          completedAt: new Date(),
-          status: 'unread'
-        }
-      })
-
-      const response = await completionApp.handle(
-        new Request('http://localhost/api/notifications/ocr-completion')
-      )
-      
-      expect(response.status).toBe(200)
-      const data = await response.json()
-      expect(data?.status).toBe('unread')
-    })
-
-    it('should return null when no unread statuses exist', async () => {
-      const response = await completionApp.handle(
-        new Request('http://localhost/api/notifications/ocr-completion')
-      )
-      
-      expect(response.status).toBe(200)
-      const text = await response.text()
-      expect(text).toBe('')
-    })
-  })
-
-  describe('DELETE /api/notifications/ocr-completion', () => {
-    it('should dismiss all unread completion statuses', async () => {
-      // Create multiple unread statuses
-      await prisma.ocrCompletionStatus.createMany({
-        data: [
-          {
-            totalPages: 5,
-            completedPages: 5,
-            failedPages: 0,
-            completedAt: new Date(),
-            status: 'unread'
-          },
-          {
-            totalPages: 5,
-            completedPages: 3,
-            failedPages: 2,
-            completedAt: new Date(),
-            status: 'unread'
-          }
-        ]
-      })
-
-      const response = await completionApp.handle(
-        new Request('http://localhost/api/notifications/ocr-completion', {
-          method: 'DELETE'
-        })
-      )
-      
-      expect(response.status).toBe(200)
-      const data = await response.json()
-      expectSuccessResponse(data)
-      expect(data.message).toContain('dismissed')
-
-      // Verify statuses are dismissed
-      const unreadStatuses = await prisma.ocrCompletionStatus.findMany({
-        where: { status: 'unread' }
-      })
-      expect(unreadStatuses).toHaveLength(0)
-
-      const dismissedStatuses = await prisma.ocrCompletionStatus.findMany({
-        where: { status: 'dismissed' }
-      })
-      expect(dismissedStatuses).toHaveLength(2)
-    })
-
-    it('should handle no unread statuses gracefully', async () => {
-      const response = await completionApp.handle(
-        new Request('http://localhost/api/notifications/ocr-completion', {
-          method: 'DELETE'
-        })
-      )
-      
-      expect(response.status).toBe(200)
-      const data = await response.json()
-      expectSuccessResponse(data)
-    })
-  })
-})
