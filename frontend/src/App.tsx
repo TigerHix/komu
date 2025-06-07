@@ -4,7 +4,6 @@ import { Toaster } from '@/components/ui/toaster'
 import { OcrProgressNotification } from '@/components/OcrProgressNotification'
 import { OcrCompleteNotification } from '@/components/OcrCompleteNotification'
 import { BottomTabs } from '@/components/BottomTabs'
-import { PageTransition } from '@/components/PageTransition'
 import { useWebSocket } from '@/hooks/useWebSocket'
 import { useDarkMode } from '@/hooks/useDarkMode'
 import Library from '@/pages/Library'
@@ -24,7 +23,7 @@ function AppContent() {
   )
   
   // Initialize dark mode at app level
-  const { isDarkMode } = useDarkMode()
+  useDarkMode()
 
   // Reset scroll position when route changes (only for reader pages that need it)
   useEffect(() => {
@@ -48,14 +47,6 @@ function AppContent() {
     showOcrProgress && 
     ocrProgress && 
     ocrProgress.isProcessing
-
-  // Debug logging
-  console.log('📱 App state:', {
-    isReaderPage,
-    showOcrProgress,
-    ocrProgress,
-    shouldShowProgress
-  })
 
   const handleRetryFailed = async () => {
     try {
