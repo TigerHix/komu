@@ -4,6 +4,7 @@ import { Keyboard, Zoom, Virtual, Navigation } from 'swiper/modules'
 import type { Swiper as SwiperType } from 'swiper'
 import { SvgTextOverlay } from './SvgTextOverlay'
 import { TextBlock, Page, Dimensions } from '@/constants/reader'
+import { useCustomZoom } from '@/hooks/useCustomZoom'
 
 // Import Swiper styles
 import 'swiper/css'
@@ -42,10 +43,13 @@ export function TwoPageGallery({
   pagePairingMode = 'manga'
 }: TwoPageGalleryProps) {
   const swiperRef = useRef<SwiperType>()
-  const clickTimeoutRef = useRef<NodeJS.Timeout | null>(null)
-  const isZoomedRef = useRef(false)
-  const touchStartTimeRef = useRef<number>(0)
-  const lastTouchMoveTimeRef = useRef<number>(0)
+
+  // Use the custom zoom hook
+  const { handleClick, handleZoomChange, handleTouchStart, handleTouchMove, cleanup, isZoomedRef } = useCustomZoom({
+    swiperRef,
+    onBackgroundClick,
+    maxZoomRatio: 1.5
+  })
 
   // Calculate which spread contains the current page
   const getCurrentSpreadIndex = useCallback(() => {
@@ -106,43 +110,12 @@ export function TwoPageGallery({
     }
   }, [disableKeyboard])
 
-  // Track zoom state
-  const handleZoomChange = useCallback((swiper: SwiperType, scale: number) => {
-    isZoomedRef.current = scale > 1
-  }, [])
-
-  // Handle single/double click distinction
-  const handleClick = useCallback((e: React.MouseEvent) => {
-    const now = Date.now()
-    const timeSinceLastMove = now - lastTouchMoveTimeRef.current
-    const touchDuration = now - touchStartTimeRef.current
-    
-    const hasRecentTiming = (now - touchStartTimeRef.current) < 2000
-    
-    if (hasRecentTiming && isZoomedRef.current && (timeSinceLastMove < 100 || touchDuration > 300)) {
-      return
-    }
-
-    if (clickTimeoutRef.current) {
-      clearTimeout(clickTimeoutRef.current)
-      clickTimeoutRef.current = null
-      return
-    }
-
-    clickTimeoutRef.current = setTimeout(() => {
-      clickTimeoutRef.current = null
-      onBackgroundClick?.()
-    }, 250)
-  }, [onBackgroundClick])
-
   // Cleanup timeout on unmount
   useEffect(() => {
     return () => {
-      if (clickTimeoutRef.current) {
-        clearTimeout(clickTimeoutRef.current)
-      }
+      cleanup()
     }
-  }, [])
+  }, [cleanup])
 
   // Handle spread navigation
   const handleSpreadChange = useCallback((newSpreadIndex: number) => {
@@ -190,7 +163,7 @@ export function TwoPageGallery({
         zoom={{
           maxRatio: 1.5,
           minRatio: 1,
-          toggle: true,
+          toggle: false, // Disable built-in double-click zoom
           containerClass: 'swiper-zoom-container',
           zoomedSlideClass: 'swiper-slide-zoomed'
         }}
@@ -207,14 +180,8 @@ export function TwoPageGallery({
         }}
 
         onZoomChange={handleZoomChange}
-        
-        onTouchStart={() => {
-          touchStartTimeRef.current = Date.now()
-        }}
-        
-        onTouchMove={() => {
-          lastTouchMoveTimeRef.current = Date.now()
-        }}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
         
         onSlideChangeTransitionEnd={(swiper) => {
           const newSpreadIndex = swiper.activeIndex
@@ -261,8 +228,8 @@ export function TwoPageGallery({
                           isGrammarOpen={isGrammarOpen}
                           selectedBlockIndex={selectedPageIndex === spreadPages[0] ? selectedBlockIndex : null}
                           pageIndex={spreadPages[0]}
-                          touchStartTime={touchStartTimeRef.current}
-                          lastTouchMoveTime={lastTouchMoveTimeRef.current}
+                          touchStartTime={0}
+                          lastTouchMoveTime={0}
                           isZoomed={isZoomedRef.current}
                         />
                       )}
@@ -291,8 +258,8 @@ export function TwoPageGallery({
                             isGrammarOpen={isGrammarOpen}
                             selectedBlockIndex={selectedPageIndex === (readingMode === 'rtl' ? spreadPages[0] : spreadPages[1]) ? selectedBlockIndex : null}
                             pageIndex={readingMode === 'rtl' ? spreadPages[0] : spreadPages[1]}
-                            touchStartTime={touchStartTimeRef.current}
-                            lastTouchMoveTime={lastTouchMoveTimeRef.current}
+                            touchStartTime={0}
+                            lastTouchMoveTime={0}
                             isZoomed={isZoomedRef.current}
                           />
                         )}
@@ -319,8 +286,8 @@ export function TwoPageGallery({
                             isGrammarOpen={isGrammarOpen}
                             selectedBlockIndex={selectedPageIndex === (readingMode === 'rtl' ? spreadPages[1] : spreadPages[0]) ? selectedBlockIndex : null}
                             pageIndex={readingMode === 'rtl' ? spreadPages[1] : spreadPages[0]}
-                            touchStartTime={touchStartTimeRef.current}
-                            lastTouchMoveTime={lastTouchMoveTimeRef.current}
+                            touchStartTime={0}
+                            lastTouchMoveTime={0}
                             isZoomed={isZoomedRef.current}
                           />
                         )}

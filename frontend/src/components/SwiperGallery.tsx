@@ -4,6 +4,7 @@ import { Keyboard, Zoom, Virtual, Navigation, FreeMode, Mousewheel } from 'swipe
 import type { Swiper as SwiperType } from 'swiper'
 import { SvgTextOverlay } from './SvgTextOverlay'
 import { TextBlock, Page, Dimensions } from '@/constants/reader'
+import { useCustomZoom } from '@/hooks/useCustomZoom'
 
 // Import Swiper styles
 import 'swiper/css'
@@ -39,10 +40,13 @@ export function SwiperGallery({
   disableKeyboard = false
 }: SwiperGalleryProps) {
   const swiperRef = useRef<SwiperType>()
-  const clickTimeoutRef = useRef<NodeJS.Timeout | null>(null)
-  const isZoomedRef = useRef(false)
-  const touchStartTimeRef = useRef<number>(0)
-  const lastTouchMoveTimeRef = useRef<number>(0)
+
+  // Use the custom zoom hook
+  const { handleClick, handleZoomChange, handleTouchStart, handleTouchMove, cleanup, isZoomedRef } = useCustomZoom({
+    swiperRef,
+    onBackgroundClick,
+    maxZoomRatio: 1.5
+  })
 
   useEffect(() => {
     if (swiperRef.current && swiperRef.current.activeIndex !== currentPageIndex) {
@@ -61,61 +65,12 @@ export function SwiperGallery({
     }
   }, [disableKeyboard])
 
-  // Track zoom state
-  const handleZoomChange = useCallback((swiper: SwiperType, scale: number) => {
-    isZoomedRef.current = scale > 1
-    console.log('Zoom changed:', { scale, isZoomed: isZoomedRef.current })
-  }, [])
-
-  // Handle single/double click distinction
-  const handleClick = useCallback((e: React.MouseEvent) => {
-    const now = Date.now()
-    const timeSinceLastMove = now - lastTouchMoveTimeRef.current
-    const touchDuration = now - touchStartTimeRef.current
-    
-    console.log('Click event:', { 
-      isZoomed: isZoomedRef.current,
-      timeSinceLastMove,
-      touchDuration,
-      touchStartTime: touchStartTimeRef.current,
-      lastTouchMoveTime: lastTouchMoveTimeRef.current,
-      now
-    })
-    
-    // Only apply pan detection if we have recent timing data (within last 2 seconds)
-    const hasRecentTiming = (now - touchStartTimeRef.current) < 2000
-    
-    if (hasRecentTiming && isZoomedRef.current && (timeSinceLastMove < 100 || touchDuration > 300)) {
-      console.log('Click ignored - likely panning')
-      return
-    }
-
-    // Clear any existing timeout
-    if (clickTimeoutRef.current) {
-      clearTimeout(clickTimeoutRef.current)
-      clickTimeoutRef.current = null
-      console.log('Double-click detected, ignoring')
-      // This is a double-click, don't trigger background click
-      return
-    }
-
-    // Set timeout for single click
-    clickTimeoutRef.current = setTimeout(() => {
-      clickTimeoutRef.current = null
-      console.log('Single click confirmed, triggering toolbar toggle')
-      // Only trigger background click for single clicks without panning
-      onBackgroundClick?.()
-    }, 250) // 250ms delay to detect double-click
-  }, [onBackgroundClick])
-
   // Cleanup timeout on unmount
   useEffect(() => {
     return () => {
-      if (clickTimeoutRef.current) {
-        clearTimeout(clickTimeoutRef.current)
-      }
+      cleanup()
     }
-  }, [])
+  }, [cleanup])
 
   return (
     <div className="w-full h-full bg-black">
@@ -159,7 +114,7 @@ export function SwiperGallery({
         zoom={{
           maxRatio: 1.5,
           minRatio: 1,
-          toggle: true,
+          toggle: false, // Disable built-in double-click zoom
           containerClass: 'swiper-zoom-container',
           zoomedSlideClass: 'swiper-slide-zoomed'
         }}
@@ -177,16 +132,8 @@ export function SwiperGallery({
         }}
 
         onZoomChange={handleZoomChange}
-        
-        onTouchStart={() => {
-          touchStartTimeRef.current = Date.now()
-          console.log('Touch start at:', touchStartTimeRef.current)
-        }}
-        
-        onTouchMove={() => {
-          lastTouchMoveTimeRef.current = Date.now()
-          console.log('Touch move at:', lastTouchMoveTimeRef.current)
-        }}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
         
         onSlideChangeTransitionEnd={(swiper) => {
           const newIndex = swiper.activeIndex
@@ -226,8 +173,8 @@ export function SwiperGallery({
                     isGrammarOpen={isGrammarOpen}
                     selectedBlockIndex={selectedBlockIndex}
                     pageIndex={currentPageIndex}
-                    touchStartTime={touchStartTimeRef.current}
-                    lastTouchMoveTime={lastTouchMoveTimeRef.current}
+                    touchStartTime={0}
+                    lastTouchMoveTime={0}
                     isZoomed={isZoomedRef.current}
                   />
                 )}
