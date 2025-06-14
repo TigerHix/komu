@@ -59,6 +59,21 @@ class PromptLoader {
     
     return prompt
   }
+  
+  getEmoticonPrompt(): string {
+    // Emoticon prompt is language-agnostic, load from root prompts directory
+    const promptPath = join(this.promptsDir, 'use-emoticon.txt')
+    if (!existsSync(promptPath)) {
+      throw new Error(`Emoticon prompt file not found: ${promptPath}`)
+    }
+    
+    try {
+      return readFileSync(promptPath, 'utf-8').trim()
+    } catch (error) {
+      console.error(`Failed to read emoticon prompt file: ${promptPath}`, error)
+      throw new Error(`Could not load emoticon prompt file`)
+    }
+  }
 }
 
 // Export singleton instance

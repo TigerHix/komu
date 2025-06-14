@@ -110,6 +110,9 @@
   "reader": {
     "readingMode": "Reading Mode",
     "pageCount": "Page {{current}} of {{total}}",
+    "singlePage": "Single Page",
+    "twoPage": "Two-Page Spread",
+    "changePagePairing": "Change Page Pairing",
     "modes": {
       "rtl": "Right to Left (RTL)",
       "ltr": "Left to Right (LTR)", 

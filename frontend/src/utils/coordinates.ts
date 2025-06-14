@@ -203,8 +203,33 @@ export function calculateTextBlockScreenPosition(
         return null
       }
 
-      // Get the image element in the active slide
-      const imgElement = activeSlide.querySelector('img') as HTMLImageElement
+      // Check if we're in two-page mode (multiple images in the slide)
+      const imgElements = activeSlide.querySelectorAll('img') as NodeListOf<HTMLImageElement>
+      let imgElement: HTMLImageElement | null = null
+
+      if (imgElements.length === 1) {
+        // Single page mode
+        imgElement = imgElements[0]
+      } else if (imgElements.length === 2) {
+        // Two-page mode - find the correct image by page number
+        const targetPageAlt = `Page ${pageIndex + 1}`
+        
+        for (const img of imgElements) {
+          if (img.alt === targetPageAlt) {
+            imgElement = img
+            break
+          }
+        }
+        
+        if (!imgElement) {
+          console.warn('Could not find image element for page:', pageIndex)
+          return null
+        }
+      } else {
+        console.warn('Unexpected number of images in slide:', imgElements.length)
+        return null
+      }
+
       if (!imgElement) {
         console.warn('Could not find image element in active slide')
         return null

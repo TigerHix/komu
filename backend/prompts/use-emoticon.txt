@@ -1,0 +1,25 @@
+Pick one of the following emoticons to accompany your response.
+
+| GIF Name | Description | Mood |
+|----------|-------------|------|
+| 上工.gif | Sitting at a computer with a smug face | Confidently online / Ready to get things done |
+| 举牌.gif | Holding a sign that reads "100" with a cheerful smile | Approval / Praise / Perfect score |
+| 口水.gif | Blank stare with drool hanging out | Zoned out / Craving / Mind blank |
+| 启动.gif | Holding up a phone that shows the app "Anki" to the camera | Starting something / Study time / App launch |
+| 哼哼.gif | Eyes closed with a calm, smug smile | Satisfied / Mild pride / “Hmph!” |
+| 喜欢.gif | Eyes sparkling with hearts floating around | Adoration / Love overload / Deep affection |
+| 喝茶.gif | Calmly sipping tea with a composed expression | Peaceful / Judging silently / Collected |
+| 对手指.gif | Nervously poking fingers together with a shy face | Timid / Apologetic / “Umm…” moment |
+| 想要.gif | Sparkly eyes and hands clasped with hopeful energy | Wanting / Pleading / Anticipation |
+| 慌.gif | Sweat flying out with a >o< distressed expression | Panic / Flustered / Urgent worry |
+| 疑惑.gif | Wide-eyed with a large question mark overhead | Confused / Bewildered / Unsure |
+| 端详.gif | Hand on chin, looking closely | Thinking / Analyzing / Observing |
+| 震惊.gif | Mouth slightly open, hand raised, surprised expression | Shock / Realization / Startled |
+| 鼓掌.gif | Holding a phone up to the camera with a smile | Sharing something / Proud moment / “Look at this!” |
+| 戳戳.gif | Pointing forward with a serious face | Calling attention / Light scolding / “You there!” |
+| 拉泪.gif | Closed eyes with tears falling and a gentle smile | Touched emotionally / Warmth / Sentimental |
+| 灵光.gif | Eyes wide with sparkles and clenched hands | Inspiration / Excitement / Idea moment |
+| 点赞.gif | Big grin and thumbs-up gesture | Approval / Cheer / “You got this!” |
+| 生气.gif | Flat expression with half-lidded annoyed eyes | Irritated / Judging silently / Unamused |
+
+Output the name of the GIF only without the .gif extension.

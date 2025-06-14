@@ -110,6 +110,9 @@
   "reader": {
     "readingMode": "阅读模式",
     "pageCount": "第{{current}}页 共{{total}}页",
+    "singlePage": "单页模式",
+    "twoPage": "双页展开",
+    "changePagePairing": "更改页面配对",
     "modes": {
       "rtl": "从右到左 (RTL)",
       "ltr": "从左到右 (LTR)", 

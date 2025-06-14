@@ -120,8 +120,25 @@ export function SvgTextOverlay({
                 }
               }
               
-              console.log('Text block click confirmed')
-              onBlockClick(block, index, pageIndex, { x: e.clientX, y: e.clientY })
+              // Calculate click position relative to the text block center for better popup positioning
+              if (!svgRef.current) {
+                onBlockClick(block, index, pageIndex, { x: e.clientX, y: e.clientY })
+                return
+              }
+              
+              // Get the SVG's position and the text block center
+              const svgRect = svgRef.current.getBoundingClientRect()
+              const blockCenterX = (block.bbox[0] + block.bbox[2]) / 2
+              const blockCenterY = (block.bbox[1] + block.bbox[3]) / 2
+              
+              // Convert block center from SVG coordinates to screen coordinates
+              const scaleX = svgRect.width / imageSize.width
+              const scaleY = svgRect.height / imageSize.height
+              
+              const screenX = svgRect.left + (blockCenterX * scaleX)
+              const screenY = svgRect.top + (blockCenterY * scaleY)
+              
+              onBlockClick(block, index, pageIndex, { x: screenX, y: screenY })
             }}
           >
             <title>{block.text}</title>

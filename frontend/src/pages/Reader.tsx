@@ -3,18 +3,19 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Button } from '@/components/ui/button'
 import { MangaCoverTransition } from '@/components/PageTransition'
-import { ArrowLeft, Settings, Loader2, Monitor, BookOpen, Scroll, Bug } from 'lucide-react'
+import { ArrowLeft, Settings, Loader2, Monitor, BookOpen, Scroll, Bug, BookOpenCheck, ChevronsLeftRight, SplitSquareHorizontal } from 'lucide-react'
 import { GrammarBreakdown } from '@/components/GrammarBreakdown'
 import { SwiperGallery } from '@/components/SwiperGallery'
+import { TwoPageGallery } from '@/components/TwoPageGallery'
 import { ScrollingGallery } from '@/components/ScrollingGallery'
 import { TextPopoutModal } from '@/components/TextPopoutModal'
 import { analyzeGrammar, cleanTextForAnalysis, type GrammarToken } from '@/utils/grammarAnalysis'
 import { useOcrService } from '@/hooks/useOcrService'
 import { useReaderNavigation } from '@/hooks/useReaderNavigation'
-import { useReaderDebug } from '@/hooks/useReaderDebug'
 import { useDarkMode } from '@/hooks/useDarkMode'
 import { ReadingMode, Manga, TextBlock, READER_CONSTANTS } from '@/constants/reader'
 import { useTranslation } from 'react-i18next'
+import { getImageSizeForPage } from '@/utils/readerUtils'
 
 export default function Reader() {
   const { id, page: urlPage } = useParams()
@@ -34,6 +35,18 @@ export default function Reader() {
     return (localStorage.getItem('readingMode') as ReadingMode) || 'rtl'
   })
   const [showSettings, setShowSettings] = useState(false)
+  
+  // Two-page spread state
+  const [isTwoPageMode, setIsTwoPageMode] = useState(() => {
+    // Default to true on desktop/tablet (screen width > 768px)
+    if (typeof window !== 'undefined') {
+      return window.innerWidth > 768 && localStorage.getItem('twoPageMode') !== 'false'
+    }
+    return false
+  })
+  const [pagePairingMode, setPagePairingMode] = useState<'manga' | 'book'>(() => {
+    return (localStorage.getItem('pagePairingMode') as 'manga' | 'book') || 'manga'
+  })
   const settingsRef = useRef<HTMLDivElement>(null)
   const settingsButtonRef = useRef<HTMLButtonElement>(null)
   
@@ -59,8 +72,8 @@ export default function Reader() {
     return 0
   })
   
-  const progressUpdateTimeoutRef = useRef<number | null>(null)
-  const progressBarDebounceRef = useRef<number | null>(null)
+  const progressUpdateTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const progressBarDebounceRef = useRef<NodeJS.Timeout | null>(null)
   const isProgressBarDragging = useRef(false)
 
   // URL sync function
@@ -96,7 +109,6 @@ export default function Reader() {
 
   // Custom hooks
   const ocrService = useOcrService()
-  const { debugCurrentState } = useReaderDebug()
   const { isDarkMode } = useDarkMode()
   const { t } = useTranslation()
 
@@ -158,6 +170,8 @@ export default function Reader() {
 
     const actualPageIndex = pageIndex ?? currentPage
 
+
+
     // Use the actual click position for animation
     if (clickPosition) {
       setClickPosition(clickPosition)
@@ -183,7 +197,7 @@ export default function Reader() {
     } finally {
       setGrammarAnalysisLoading(false)
     }
-  }, [currentPage, readingMode, ocrService.scrollImageSizes, ocrService.singlePageImageSize])
+  }, [currentPage, readingMode, isTwoPageMode, pagePairingMode, manga, ocrService.scrollImageSizes, ocrService.singlePageImageSize])
 
   const closeGrammarBreakdown = useCallback(() => {
     setShowGrammarBreakdown(false)
@@ -324,19 +338,19 @@ export default function Reader() {
       return () => document.removeEventListener('mousedown', handleClickOutside)
     }
   }, [showSettings])
-
-  // Debug handler
-  const handleDebug = useCallback(() => {
-    debugCurrentState({
-      textBlocks: ocrService.singlePageTextBlocks,
-      imageSize: ocrService.singlePageImageSize
-    })
-  }, [debugCurrentState, ocrService.singlePageTextBlocks, ocrService.singlePageImageSize])
-
   // Save reading mode to localStorage
   useEffect(() => {
     localStorage.setItem('readingMode', readingMode)
   }, [readingMode])
+
+  // Save two-page mode settings to localStorage
+  useEffect(() => {
+    localStorage.setItem('twoPageMode', isTwoPageMode.toString())
+  }, [isTwoPageMode])
+
+  useEffect(() => {
+    localStorage.setItem('pagePairingMode', pagePairingMode)
+  }, [pagePairingMode])
 
   // Sync progressBarValue when currentPage changes from other sources (not progress bar)
   useEffect(() => {
@@ -424,18 +438,73 @@ export default function Reader() {
     if (!manga || !manga.pages[currentPage]) return
 
     const currentPageData = manga.pages[currentPage]
+
+    // Helper function to get spread pages for a given page index
+    const getSpreadPages = (pageIndex: number) => {
+      if (pagePairingMode === 'manga') {
+        // Manga mode: page 0 alone, then 1+2, 3+4, 5+6, etc.
+        if (pageIndex === 0) return [0]
+        const spreadIndex = Math.floor((pageIndex - 1) / 2) + 1
+        const firstPageIndex = (spreadIndex - 1) * 2 + 1
+        const secondPageIndex = firstPageIndex + 1
+        return secondPageIndex < manga.pages.length ? [firstPageIndex, secondPageIndex] : [firstPageIndex]
+      } else {
+        // Book mode: 0+1, 2+3, 4+5, etc.
+        const spreadIndex = Math.floor(pageIndex / 2)
+        const firstPageIndex = spreadIndex * 2
+        const secondPageIndex = firstPageIndex + 1
+        return secondPageIndex < manga.pages.length ? [firstPageIndex, secondPageIndex] : [firstPageIndex]
+      }
+    }
     
     if (readingMode === 'scrolling') {
-      // In scrolling mode, check OCR for current page and adjacent pages (for smooth scrolling)
-      const pagesToCheck = [
-        Math.max(0, currentPage - 1),
-        currentPage,
-        Math.min(manga.pages.length - 1, currentPage + 1)
-      ]
-      
-      pagesToCheck.forEach((pageIdx) => {
+      if (isTwoPageMode) {
+        // Scrolling + Two-page mode: check OCR for current spread and adjacent spreads
+        const currentSpreadPages = getSpreadPages(currentPage)
+        
+        // Find adjacent spreads for smooth scrolling
+        const allSpreadsToCheck = new Set<number>()
+        
+        // Add current spread pages
+        currentSpreadPages.forEach(pageIdx => allSpreadsToCheck.add(pageIdx))
+        
+        // Add adjacent spreads
+        const prevPage = Math.max(0, currentPage - 2)
+        const nextPage = Math.min(manga.pages.length - 1, currentPage + 2)
+        
+        if (prevPage !== currentPage) {
+          getSpreadPages(prevPage).forEach(pageIdx => allSpreadsToCheck.add(pageIdx))
+        }
+        if (nextPage !== currentPage) {
+          getSpreadPages(nextPage).forEach(pageIdx => allSpreadsToCheck.add(pageIdx))
+        }
+        
+        // Check OCR for all pages in spreads
+        Array.from(allSpreadsToCheck).forEach((pageIdx) => {
+          if (manga.pages[pageIdx]) {
+            ocrService.checkScrollPageOcr(pageIdx, manga.pages[pageIdx])
+          }
+        })
+      } else {
+        // Scrolling single-page mode: check OCR for current page and adjacent pages
+        const pagesToCheck = [
+          Math.max(0, currentPage - 1),
+          currentPage,
+          Math.min(manga.pages.length - 1, currentPage + 1)
+        ]
+        
+        pagesToCheck.forEach((pageIdx) => {
+          if (manga.pages[pageIdx]) {
+            ocrService.checkScrollPageOcr(pageIdx, manga.pages[pageIdx])
+          }
+        })
+      }
+    } else if (isTwoPageMode) {
+      // Non-scrolling two-page mode: check OCR for current spread
+      const spreadPages = getSpreadPages(currentPage)
+      spreadPages.forEach((pageIdx) => {
         if (manga.pages[pageIdx]) {
-          ocrService.checkScrollPageOcr(pageIdx, manga.pages[pageIdx])
+          ocrService.checkTwoPageOcr(pageIdx, manga.pages[pageIdx])
         }
       })
     } else {
@@ -445,7 +514,7 @@ export default function Reader() {
     
     const cleanup = ocrService.startPageViewTracking(currentPageData.id)
     return cleanup
-  }, [manga, currentPage, readingMode, ocrService.checkSinglePageOcr, ocrService.checkScrollPageOcr, ocrService.startPageViewTracking])
+  }, [manga, currentPage, readingMode, isTwoPageMode, pagePairingMode, ocrService.checkSinglePageOcr, ocrService.checkScrollPageOcr, ocrService.checkTwoPageOcr, ocrService.startPageViewTracking])
 
   // Reset states when switching reading modes
   useEffect(() => {
@@ -499,7 +568,7 @@ export default function Reader() {
       },
       onBlockClick: handleBlockClick,
       onBackgroundClick: () => setShowUI(!showUI),
-      readingMode
+      readingMode: readingMode as 'rtl' | 'ltr'
     }
 
     return (
@@ -507,14 +576,30 @@ export default function Reader() {
         {readingMode === 'scrolling' ? (
           <ScrollingGallery 
             {...baseProps}
+            readingMode={readingMode}
             scrollTextBlocks={ocrService.scrollTextBlocks}
             scrollImageSizes={ocrService.scrollImageSizes}
             isGrammarOpen={showGrammarBreakdown}
             selectedBlockIndex={selectedBlockIndex}
+            selectedPageIndex={selectedPageIndex}
+            isTwoPageMode={isTwoPageMode}
+            pagePairingMode={pagePairingMode}
+          />
+        ) : isTwoPageMode ? (
+          <TwoPageGallery 
+            {...baseProps}
+            textBlocks={ocrService.twoPageTextBlocks}
+            imageSizes={ocrService.twoPageImageSizes}
+            isGrammarOpen={showGrammarBreakdown}
+            selectedBlockIndex={selectedBlockIndex}
+            selectedPageIndex={selectedPageIndex}
+            disableKeyboard={shouldDisableKeyboard}
+            pagePairingMode={pagePairingMode}
           />
         ) : (
           <SwiperGallery 
             {...baseProps}
+            readingMode={readingMode}
             textBlocks={ocrService.singlePageTextBlocks}
             imageSize={ocrService.singlePageImageSize}
             isGrammarOpen={showGrammarBreakdown}
@@ -737,8 +822,44 @@ export default function Reader() {
                   />
                 </div>
 
-                {/* Settings Controls */}
-                <div className="flex items-center">
+                {/* Two-Page and Settings Controls */}
+                <div className="flex items-center gap-2">
+                  {/* Page pairing mode toggle (only show in two-page mode) */}
+                  {isTwoPageMode && (
+                    <motion.div
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
+                    >
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setPagePairingMode(pagePairingMode === 'manga' ? 'book' : 'manga')}
+                        className="text-text-secondary hover:text-text-primary hover:bg-surface-2 p-2 rounded-xl transition-all duration-200"
+                        title={t('reader.changePagePairing')}
+                      >
+                        <ChevronsLeftRight className="h-4 w-4" />
+                      </Button>
+                    </motion.div>
+                  )}
+
+                  {/* Two-page mode toggle (show for all reading modes) */}
+                  <motion.div
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                  >
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setIsTwoPageMode(!isTwoPageMode)}
+                      className={`text-text-secondary hover:text-text-primary hover:bg-surface-2 p-2 rounded-xl transition-all duration-200 ${
+                        isTwoPageMode ? 'bg-surface-2 text-text-primary' : ''
+                      }`}
+                      title={isTwoPageMode ? t('reader.singlePage') : t('reader.twoPage')}
+                    >
+                      <SplitSquareHorizontal className="h-4 w-4" />
+                    </Button>
+                  </motion.div>
+                  
                   <motion.div
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
@@ -769,15 +890,10 @@ export default function Reader() {
           ? manga.pages[selectedPageIndex].imagePath 
           : (currentPageData?.imagePath || '')
         }
-        imageSize={selectedPageIndex !== null && readingMode === 'scrolling' 
-          ? ocrService.scrollImageSizes[selectedPageIndex] || { width: 800, height: 1200 }
-          : readingMode === 'scrolling' 
-            ? ocrService.scrollImageSizes[currentPage] || { width: 800, height: 1200 }
-            : ocrService.singlePageImageSize
-        }
+        imageSize={getImageSizeForPage(selectedPageIndex, readingMode, isTwoPageMode, currentPage, ocrService)}
         onClose={() => {}}
         isBottomSheetExpanded={sheetProgress > 0.3}
-        originalPosition={clickPosition}
+        originalPosition={clickPosition || undefined}
         sheetProgress={sheetProgress}
         pageIndex={selectedPageIndex ?? currentPage}
       />
@@ -789,19 +905,14 @@ export default function Reader() {
         tokens={grammarTokens}
         loading={grammarAnalysisLoading}
         originalText={selectedSentence}
-        textBlockId={selectedTextBlockId}
+        textBlockId={selectedTextBlockId || undefined}
         onTextUpdate={handleTextUpdate}
         selectedBlock={selectedBlock}
         imagePath={selectedPageIndex !== null && manga?.pages[selectedPageIndex] 
           ? manga.pages[selectedPageIndex].imagePath 
           : (currentPageData?.imagePath || '')
         }
-        imageSize={selectedPageIndex !== null && readingMode === 'scrolling' 
-          ? ocrService.scrollImageSizes[selectedPageIndex] || { width: 800, height: 1200 }
-          : readingMode === 'scrolling' 
-            ? ocrService.scrollImageSizes[currentPage] || { width: 800, height: 1200 }
-            : ocrService.singlePageImageSize
-        }
+        imageSize={getImageSizeForPage(selectedPageIndex, readingMode, isTwoPageMode, currentPage, ocrService)}
         onSheetExpansionChange={(progress) => {
           setSheetProgress(progress)
         }}

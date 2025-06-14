@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback, useState } from 'react'
+import { useEffect, useRef, useCallback, useState, useMemo } from 'react'
 import { VariableSizeList } from 'react-window'
 import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch'
 import { SvgTextOverlay } from './SvgTextOverlay'
@@ -15,6 +15,9 @@ interface ScrollingGalleryProps {
   readingMode?: 'rtl' | 'ltr' | 'scrolling'
   isGrammarOpen?: boolean
   selectedBlockIndex?: number | null
+  selectedPageIndex?: number | null
+  isTwoPageMode?: boolean
+  pagePairingMode?: 'manga' | 'book'
 }
 
 interface ScrollingSlideProps {
@@ -28,12 +31,130 @@ interface ScrollingSlideProps {
     onBackgroundClick?: () => void
     isGrammarOpen?: boolean
     selectedBlockIndex?: number | null
+    selectedPageIndex?: number | null
+    currentPageIndex: number
+    isTwoPageMode?: boolean
+    pagePairingMode?: 'manga' | 'book'
+    readingMode?: 'rtl' | 'ltr' | 'scrolling'
+    spreads: number[][]
   }
 }
 
+// Helper functions
+const calculateSpreads = (pages: Page[], pagePairingMode: 'manga' | 'book'): number[][] => {
+  const result: number[][] = []
+  
+  if (pagePairingMode === 'manga') {
+    // Manga mode: page 0 alone, then 1+2, 3+4, 5+6, etc.
+    result.push([0])
+    for (let i = 1; i < pages.length; i += 2) {
+      if (i + 1 < pages.length) {
+        result.push([i, i + 1])
+      } else {
+        result.push([i])
+      }
+    }
+  } else {
+    // Book mode: 0+1, 2+3, 4+5, etc.
+    for (let i = 0; i < pages.length; i += 2) {
+      if (i + 1 < pages.length) {
+        result.push([i, i + 1])
+      } else {
+        result.push([i])
+      }
+    }
+  }
+  
+  return result
+}
+
+const findSpreadIndex = (spreads: number[][], pageIndex: number): number => {
+  for (let i = 0; i < spreads.length; i++) {
+    if (spreads[i].includes(pageIndex)) {
+      return i
+    }
+  }
+  return 0
+}
+
+// Sub-components
+interface PageImageProps {
+  page: Page
+  pageIndex: number
+  className: string
+  style?: React.CSSProperties
+}
+
+const PageImage = ({ page, pageIndex, className, style }: PageImageProps) => (
+  <img
+    src={page.imagePath}
+    alt={`Page ${pageIndex + 1}`}
+    className={className}
+    draggable={false}
+    loading="lazy"
+    decoding="async"
+    style={{
+      userSelect: 'none',
+      pointerEvents: 'none',
+      height: '100%',
+      width: 'auto',
+      ...style
+    }}
+  />
+)
+
+interface PageWithOverlayProps {
+  page: Page
+  pageIndex: number
+  textBlocks: TextBlock[]
+  imageSize: Dimensions | null
+  onBlockClick: (block: TextBlock, index: number, pageIndex?: number) => void
+  isGrammarOpen: boolean
+  selectedBlockIndex: number | null
+  showOverlay: boolean
+  containerClassName: string
+  imageStyle?: React.CSSProperties
+}
+
+const PageWithOverlay = ({
+  page,
+  pageIndex,
+  textBlocks,
+  imageSize,
+  onBlockClick,
+  isGrammarOpen,
+  selectedBlockIndex,
+  showOverlay,
+  containerClassName,
+  imageStyle
+}: PageWithOverlayProps) => (
+  <div className={containerClassName}>
+    <PageImage
+      page={page}
+      pageIndex={pageIndex}
+      className="max-h-full object-contain"
+      style={imageStyle}
+    />
+    
+    {showOverlay && imageSize && textBlocks.length > 0 && (
+      <SvgTextOverlay
+        textBlocks={textBlocks}
+        imageSize={imageSize}
+        onBlockClick={onBlockClick}
+        isGrammarOpen={isGrammarOpen}
+        selectedBlockIndex={selectedBlockIndex}
+        pageIndex={pageIndex}
+        touchStartTime={0}
+        lastTouchMoveTime={0}
+        isZoomed={false}
+      />
+    )}
+  </div>
+)
+
 /**
  * Individual slide component for virtualized scrolling
- * Renders a single manga page with text overlays and proper sizing
+ * Renders either a single manga page or a two-page spread with text overlays
  */
 function ScrollingSlide({ index, style, data }: ScrollingSlideProps) {
   const { 
@@ -43,11 +164,75 @@ function ScrollingSlide({ index, style, data }: ScrollingSlideProps) {
     onBlockClick, 
     onBackgroundClick,
     isGrammarOpen = false,
-    selectedBlockIndex = null
+    selectedBlockIndex = null,
+    selectedPageIndex = null,
+    currentPageIndex,
+    isTwoPageMode = false,
+    readingMode = 'scrolling',
+    spreads
   } = data
-  const page = pages[index]
-  
-  // Get OCR data for this specific page
+
+  if (isTwoPageMode) {
+    const spreadPages = spreads[index]
+    const isCurrentSpread = spreadPages.includes(currentPageIndex)
+
+    return (
+      <div style={style} className="flex items-center justify-center bg-black">
+        <div 
+          className="relative w-full h-full flex items-center justify-center"
+          onClick={onBackgroundClick}
+        >
+          {spreadPages.length === 1 ? (
+            // Single page (first page in manga mode or last odd page)
+            <PageWithOverlay
+              page={pages[spreadPages[0]]}
+              pageIndex={spreadPages[0]}
+              textBlocks={scrollTextBlocks[spreadPages[0]] || []}
+              imageSize={scrollImageSizes[spreadPages[0]] || null}
+              onBlockClick={onBlockClick}
+              isGrammarOpen={isGrammarOpen}
+              selectedBlockIndex={selectedPageIndex === spreadPages[0] ? selectedBlockIndex : null}
+              showOverlay={isCurrentSpread}
+              containerClassName="relative h-full flex items-center justify-center max-w-full"
+            />
+          ) : (
+            // Two pages side by side - positioned together like a book spread
+            <div className="flex h-full items-center justify-center">
+              {/* Left page */}
+              <PageWithOverlay
+                page={pages[readingMode === 'rtl' ? spreadPages[0] : spreadPages[1]]}
+                pageIndex={readingMode === 'rtl' ? spreadPages[0] : spreadPages[1]}
+                textBlocks={scrollTextBlocks[readingMode === 'rtl' ? spreadPages[0] : spreadPages[1]] || []}
+                imageSize={scrollImageSizes[readingMode === 'rtl' ? spreadPages[0] : spreadPages[1]] || null}
+                onBlockClick={onBlockClick}
+                isGrammarOpen={isGrammarOpen}
+                selectedBlockIndex={selectedPageIndex === (readingMode === 'rtl' ? spreadPages[0] : spreadPages[1]) ? selectedBlockIndex : null}
+                showOverlay={isCurrentSpread}
+                containerClassName="relative h-full flex items-center justify-end"
+                imageStyle={{ maxWidth: '50vw' }}
+              />
+              
+              {/* Right page */}
+              <PageWithOverlay
+                page={pages[readingMode === 'rtl' ? spreadPages[1] : spreadPages[0]]}
+                pageIndex={readingMode === 'rtl' ? spreadPages[1] : spreadPages[0]}
+                textBlocks={scrollTextBlocks[readingMode === 'rtl' ? spreadPages[1] : spreadPages[0]] || []}
+                imageSize={scrollImageSizes[readingMode === 'rtl' ? spreadPages[1] : spreadPages[0]] || null}
+                onBlockClick={onBlockClick}
+                isGrammarOpen={isGrammarOpen}
+                selectedBlockIndex={selectedPageIndex === (readingMode === 'rtl' ? spreadPages[1] : spreadPages[0]) ? selectedBlockIndex : null}
+                showOverlay={isCurrentSpread}
+                containerClassName="relative h-full flex items-center justify-start"
+                imageStyle={{ maxWidth: '50vw' }}
+              />
+            </div>
+          )}
+        </div>
+      </div>
+    )
+  }
+
+  // Single page mode
   const pageTextBlocks = scrollTextBlocks[index] || []
   const pageImageSize = scrollImageSizes[index] || null
 
@@ -57,34 +242,17 @@ function ScrollingSlide({ index, style, data }: ScrollingSlideProps) {
         className="relative w-full h-full flex items-center justify-center"
         onClick={onBackgroundClick}
       >
-        <img
-          src={page.imagePath}
-          alt={`Page ${index + 1}`}
-          className="max-w-full max-h-full object-contain"
-          draggable={false}
-          loading="lazy"
-          decoding="async"
-          style={{
-            userSelect: 'none',
-            pointerEvents: 'none',
-            height: '100%',
-            width: 'auto'
-          }}
+        <PageWithOverlay
+          page={pages[index]}
+          pageIndex={index}
+          textBlocks={pageTextBlocks}
+          imageSize={pageImageSize}
+          onBlockClick={onBlockClick}
+          isGrammarOpen={isGrammarOpen}
+          selectedBlockIndex={selectedPageIndex === index ? selectedBlockIndex : null}
+          showOverlay={true}
+          containerClassName="relative w-full h-full flex items-center justify-center"
         />
-        
-        {pageImageSize && pageTextBlocks.length > 0 && (
-          <SvgTextOverlay
-            textBlocks={pageTextBlocks}
-            imageSize={pageImageSize}
-            onBlockClick={onBlockClick}
-            isGrammarOpen={isGrammarOpen}
-            selectedBlockIndex={selectedBlockIndex}
-            pageIndex={index}
-            touchStartTime={0}
-            lastTouchMoveTime={0}
-            isZoomed={false}
-          />
-        )}
       </div>
     </div>
   )
@@ -97,6 +265,7 @@ function ScrollingSlide({ index, style, data }: ScrollingSlideProps) {
  * - Zoom/pan functionality with react-zoom-pan-pinch
  * - Dynamic page height calculation
  * - Smooth page tracking and navigation
+ * - Two-page spread support
  */
 export function ScrollingGallery({
   pages,
@@ -107,7 +276,11 @@ export function ScrollingGallery({
   onBlockClick,
   onBackgroundClick,
   isGrammarOpen = false,
-  selectedBlockIndex = null
+  selectedBlockIndex = null,
+  selectedPageIndex = null,
+  isTwoPageMode = false,
+  pagePairingMode = 'manga',
+  readingMode = 'scrolling'
 }: ScrollingGalleryProps) {
   const listRef = useRef<VariableSizeList>(null)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -125,6 +298,19 @@ export function ScrollingGallery({
   const inertiaAnimation = useRef<number | null>(null)
   const isInertiaScrolling = useRef(false)
 
+  // Memoized calculations
+  const spreads = useMemo(() => 
+    isTwoPageMode ? calculateSpreads(pages, pagePairingMode) : [],
+    [pages, isTwoPageMode, pagePairingMode]
+  )
+
+  const currentSpreadIndex = useMemo(() => 
+    isTwoPageMode ? findSpreadIndex(spreads, currentPageIndex) : currentPageIndex,
+    [currentPageIndex, isTwoPageMode, spreads]
+  )
+
+  const itemCount = isTwoPageMode ? spreads.length : pages.length
+
   /**
    * Stop any ongoing inertia animation
    */
@@ -137,57 +323,88 @@ export function ScrollingGallery({
   }, [])
 
   /**
-   * Calculate optimal height for each page based on aspect ratio
-   * Priority: Fill window height, but constrain to window width if needed
+   * Calculate optimal height for each item (page or spread) based on aspect ratio
    */
   const getItemHeight = useCallback((index: number) => {
     if (!containerRef.current) return window.innerHeight
     
     const containerWidth = containerRef.current.offsetWidth
     const windowHeight = window.innerHeight
-    
-    // Use actual image dimensions if available for this page
-    const pageImageSize = scrollImageSizes[index]
-    if (pageImageSize) {
-      const aspectRatio = pageImageSize.height / pageImageSize.width
-      const heightForFullWidth = containerWidth * aspectRatio
+    const defaultAspectRatio = 1.4
+
+    if (isTwoPageMode) {
+      const spreadPages = spreads[index]
       
-      return Math.min(heightForFullWidth, windowHeight)
+      if (spreadPages.length === 1) {
+        // Single page
+        const pageImageSize = scrollImageSizes[spreadPages[0]]
+        if (pageImageSize) {
+          const aspectRatio = pageImageSize.height / pageImageSize.width
+          const heightForFullWidth = containerWidth * aspectRatio
+          return Math.min(heightForFullWidth, windowHeight)
+        }
+      } else {
+        // Two pages side by side - use the taller page's aspect ratio
+        let maxAspectRatio = defaultAspectRatio
+        for (const pageIndex of spreadPages) {
+          const pageImageSize = scrollImageSizes[pageIndex]
+          if (pageImageSize) {
+            const aspectRatio = pageImageSize.height / pageImageSize.width
+            maxAspectRatio = Math.max(maxAspectRatio, aspectRatio)
+          }
+        }
+        // For two pages side by side, each takes half the width
+        const heightForFullWidth = (containerWidth / 2) * maxAspectRatio
+        return Math.min(heightForFullWidth, windowHeight)
+      }
+    } else {
+      // Single page mode
+      const pageImageSize = scrollImageSizes[index]
+      if (pageImageSize) {
+        const aspectRatio = pageImageSize.height / pageImageSize.width
+        const heightForFullWidth = containerWidth * aspectRatio
+        return Math.min(heightForFullWidth, windowHeight)
+      }
     }
     
-    // Default manga aspect ratio for other pages
-    const defaultAspectRatio = 1.4
+    // Default fallback
     const heightForFullWidth = containerWidth * defaultAspectRatio
     return Math.min(heightForFullWidth, windowHeight)
-  }, [pages, scrollImageSizes])
+  }, [scrollImageSizes, isTwoPageMode, spreads])
 
   /**
    * Track scroll position and update current page
-   * Prevents infinite loops with external navigation
-   * Throttled for Safari performance
    */
   const handleScroll = useCallback(({ scrollOffset }: { scrollOffset: number }) => {
     if (!listRef.current) return
     
-    // Update current scroll position for drag-to-scroll
     currentScrollOffset.current = scrollOffset
     
-    // Stop inertia if user scrolls manually
     if (!isDragging.current && !isInertiaScrolling.current && inertiaAnimation.current) {
       stopInertia()
     }
     
     isScrollingInternally.current = true
     
-    // Find the page that's most visible at current scroll position
+    // Find the most visible item
     let accumulated = 0
-    for (let i = 0; i < pages.length; i++) {
+    const targetCount = isTwoPageMode ? spreads.length : pages.length
+    
+    for (let i = 0; i < targetCount; i++) {
       const itemHeight = getItemHeight(i)
       if (scrollOffset < accumulated + itemHeight * 0.5) {
-        if (i !== currentPageIndex) {
-          // Use requestAnimationFrame to prevent Safari crashes from rapid updates
+        let newPageIndex: number
+        
+        if (isTwoPageMode) {
+          // Navigate to first page of spread
+          newPageIndex = spreads[i][0]
+        } else {
+          newPageIndex = i
+        }
+        
+        if (newPageIndex !== currentPageIndex) {
           requestAnimationFrame(() => {
-            onPageChange(i)
+            onPageChange(newPageIndex)
           })
         }
         break
@@ -195,15 +412,12 @@ export function ScrollingGallery({
       accumulated += itemHeight
     }
     
-    // Reset flag to allow external navigation
     setTimeout(() => {
       isScrollingInternally.current = false
-    }, 150) // Slightly longer timeout for Safari
-  }, [pages.length, currentPageIndex, onPageChange, getItemHeight, stopInertia])
+    }, 150)
+  }, [currentPageIndex, onPageChange, getItemHeight, stopInertia, isTwoPageMode, spreads, pages.length])
 
-  /**
-   * Handle mouse drag start for page navigation (only when not zoomed)
-   */
+  // Mouse interaction handlers
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     if (e.button !== 0 || currentScale > 1) return
     
@@ -219,9 +433,6 @@ export function ScrollingGallery({
     e.preventDefault()
   }, [stopInertia, currentScale])
 
-  /**
-   * Handle mouse drag movement for page scrolling
-   */
   const handleMouseMove = useCallback((e: MouseEvent) => {
     if (!isDragging.current || !listRef.current) return
     
@@ -230,7 +441,6 @@ export function ScrollingGallery({
     
     listRef.current.scrollTo(Math.max(0, newScrollTop))
     
-    // Track velocity for inertia
     const now = Date.now()
     velocityTracker.current.push({ time: now, position: e.clientY })
     velocityTracker.current = velocityTracker.current.filter(point => now - point.time < 100)
@@ -238,9 +448,6 @@ export function ScrollingGallery({
     e.preventDefault()
   }, [])
 
-  /**
-   * Calculate velocity from recent mouse movements
-   */
   const calculateVelocity = useCallback(() => {
     if (velocityTracker.current.length < 2) return 0
     
@@ -256,9 +463,6 @@ export function ScrollingGallery({
     return (deltaPosition / deltaTime) * -12
   }, [])
 
-  /**
-   * Animate inertia scrolling with smooth deceleration
-   */
   const animateInertia = useCallback((initialVelocity: number) => {
     if (!listRef.current) return
     
@@ -287,9 +491,6 @@ export function ScrollingGallery({
     inertiaAnimation.current = requestAnimationFrame(animate)
   }, [])
 
-  /**
-   * Handle mouse drag end
-   */
   const handleMouseUp = useCallback(() => {
     if (!isDragging.current) return
     
@@ -304,24 +505,20 @@ export function ScrollingGallery({
     document.removeEventListener('mouseup', handleMouseUp)
   }, [handleMouseMove, calculateVelocity, animateInertia])
 
-  /**
-   * Handle external page changes (from URL, navigation buttons, etc.)
-   * Only scroll if not currently user-scrolling to prevent conflicts
-   */
+  // Effects
   useEffect(() => {
     if (listRef.current && currentPageIndex >= 0 && !isScrollingInternally.current) {
-      listRef.current.scrollToItem(currentPageIndex, 'center')
+      const targetIndex = isTwoPageMode ? currentSpreadIndex : currentPageIndex
+      listRef.current.scrollToItem(targetIndex, 'center')
     }
-  }, [currentPageIndex])
+  }, [currentPageIndex, currentSpreadIndex, isTwoPageMode])
 
-  // Recalculate list when image sizes change
   useEffect(() => {
     if (listRef.current) {
       listRef.current.resetAfterIndex(0, true)
     }
-  }, [scrollImageSizes])
+  }, [scrollImageSizes, isTwoPageMode, pagePairingMode])
 
-  // Cleanup on unmount
   useEffect(() => {
     return () => {
       document.removeEventListener('mousemove', handleMouseMove)
@@ -331,15 +528,35 @@ export function ScrollingGallery({
   }, [handleMouseMove, handleMouseUp, stopInertia])
 
   // Data passed to each slide component
-  const itemData = {
+  const itemData = useMemo(() => ({
     pages,
     scrollTextBlocks,
     scrollImageSizes,
     onBlockClick,
     onBackgroundClick,
     isGrammarOpen,
-    selectedBlockIndex
-  }
+    selectedBlockIndex,
+    selectedPageIndex,
+    currentPageIndex,
+    isTwoPageMode,
+    pagePairingMode,
+    readingMode,
+    spreads
+  }), [
+    pages,
+    scrollTextBlocks,
+    scrollImageSizes,
+    onBlockClick,
+    onBackgroundClick,
+    isGrammarOpen,
+    selectedBlockIndex,
+    selectedPageIndex,
+    currentPageIndex,
+    isTwoPageMode,
+    pagePairingMode,
+    readingMode,
+    spreads
+  ])
 
   return (
     <div ref={containerRef} className="w-full h-full bg-black">
@@ -350,10 +567,10 @@ export function ScrollingGallery({
         doubleClick={{
           disabled: false,
           mode: 'toggle',
-          step: 0.5, // 1.5x zoom to match Swiper behavior
+          step: 0.5,
         }}
         wheel={{
-          wheelDisabled: currentScale <= 1, // Allow scroll when not zoomed
+          wheelDisabled: currentScale <= 1,
           touchPadDisabled: currentScale <= 1,
           step: 0.1,
         }}
@@ -365,8 +582,8 @@ export function ScrollingGallery({
           step: 5,
         }}
         panning={{
-          disabled: currentScale <= 1, // Enable panning only when zoomed in
-          velocityDisabled: true, // Prevent conflicts with virtualized scrolling
+          disabled: currentScale <= 1,
+          velocityDisabled: true,
         }}
         limitToBounds={true}
         centerOnInit={true}
@@ -384,18 +601,17 @@ export function ScrollingGallery({
               ref={listRef}
               height={containerRef.current?.offsetHeight || window.innerHeight}
               width={containerRef.current?.offsetWidth || window.innerWidth}
-              itemCount={pages.length}
+              itemCount={itemCount}
               itemSize={getItemHeight}
               itemData={itemData}
               onScroll={handleScroll}
-              overscanCount={1} // Reduce overscan for Safari memory management
-              useIsScrolling={true} // Enable scroll state tracking
+              overscanCount={1}
+              useIsScrolling={true}
               style={{
                 scrollbarWidth: 'none',
                 msOverflowStyle: 'none',
-                // Safari-specific optimizations
                 willChange: 'scroll-position',
-                transform: 'translateZ(0)', // Force hardware acceleration
+                transform: 'translateZ(0)',
               }}
               className="[&::-webkit-scrollbar]:hidden"
             >

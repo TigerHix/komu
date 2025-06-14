@@ -27,7 +27,16 @@ export function useOcrService() {
     imageSizes: {}
   })
 
-  const viewTimerRef = useRef<number | null>(null)
+  // Two-page mode data
+  const [twoPageData, setTwoPageData] = useState<{
+    textBlocks: Record<number, TextBlock[]>
+    imageSizes: Record<number, { width: number; height: number } | null>
+  }>({
+    textBlocks: {},
+    imageSizes: {}
+  })
+
+  const viewTimerRef = useRef<NodeJS.Timeout | null>(null)
 
   const notifyPageView = useCallback(async (pageId: string) => {
     try {
@@ -101,6 +110,24 @@ export function useOcrService() {
     }
   }, [fetchOcrResults])
 
+  const checkTwoPageOcr = useCallback(async (pageNum: number, page: Page) => {
+    const result = await fetchOcrResults(page.id)
+    if (!result) return
+
+    if (result.textBlocks && result.imageSize) {
+      setTwoPageData(prev => ({
+        textBlocks: {
+          ...prev.textBlocks,
+          [pageNum]: result.textBlocks!
+        },
+        imageSizes: {
+          ...prev.imageSizes,
+          [pageNum]: result.imageSize!
+        }
+      }))
+    }
+  }, [fetchOcrResults])
+
   const startPageViewTracking = useCallback((pageId: string) => {
     if (viewTimerRef.current) {
       clearTimeout(viewTimerRef.current)
@@ -145,13 +172,34 @@ export function useOcrService() {
     })
   }, [])
 
+  const resetTwoPageData = useCallback(() => {
+    setTwoPageData({
+      textBlocks: {},
+      imageSizes: {}
+    })
+  }, [])
+
+  const resetTwoPageDataPage = useCallback((pageNum: number) => {
+    setTwoPageData(prev => {
+      const newTextBlocks = { ...prev.textBlocks }
+      const newImageSizes = { ...prev.imageSizes }
+      delete newTextBlocks[pageNum]
+      delete newImageSizes[pageNum]
+      return {
+        textBlocks: newTextBlocks,
+        imageSizes: newImageSizes
+      }
+    })
+  }, [])
+
   const resetAllOcrData = useCallback(() => {
     resetSinglePageData()
     resetScrollData()
+    resetTwoPageData()
     if (viewTimerRef.current) {
       clearTimeout(viewTimerRef.current)
     }
-  }, [resetSinglePageData, resetScrollData])
+  }, [resetSinglePageData, resetScrollData, resetTwoPageData])
 
   // Update a specific text block in the cached data
   const updateTextBlock = useCallback((textBlockId: string, newText: string, pageIndex?: number) => {
@@ -184,6 +232,21 @@ export function useOcrService() {
         console.log('OCR Service: Updated scroll page data', updated.textBlocks[pageIndex])
         return updated
       })
+      
+      // Also update in two-page mode
+      setTwoPageData(prev => {
+        const updated = {
+          ...prev,
+          textBlocks: {
+            ...prev.textBlocks,
+            [pageIndex]: (prev.textBlocks[pageIndex] || []).map(block =>
+              block.id === textBlockId ? { ...block, text: newText } : block
+            )
+          }
+        }
+        console.log('OCR Service: Updated two-page data', updated.textBlocks[pageIndex])
+        return updated
+      })
     }
   }, [])
 
@@ -200,13 +263,20 @@ export function useOcrService() {
     scrollTextBlocks: scrollPageData.textBlocks,
     scrollImageSizes: scrollPageData.imageSizes,
     
+    // Two-page mode
+    twoPageTextBlocks: twoPageData.textBlocks,
+    twoPageImageSizes: twoPageData.imageSizes,
+    
     // Actions
     checkSinglePageOcr,
     checkScrollPageOcr,
+    checkTwoPageOcr,
     startPageViewTracking,
     resetSinglePageData,
     resetScrollData,
     resetScrollPageData,
+    resetTwoPageData,
+    resetTwoPageDataPage,
     resetAllOcrData,
     updateTextBlock,
   }

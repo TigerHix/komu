@@ -94,7 +94,7 @@ export const chatRoutes = new Elysia({ prefix: '/api/explanations' })
         return { error: 'Failed to get explanation from AI service' }
       }
 
-      const result = await response.json()
+      const result = await response.json() as any
       
       if (!result.choices || !result.choices[0] || !result.choices[0].message) {
         console.error('Unexpected OpenRouter response format:', result)
@@ -229,5 +229,77 @@ export const chatRoutes = new Elysia({ prefix: '/api/explanations' })
       isWholeSentence: t.Boolean(),
       language: t.Optional(t.String()),
       mangaId: t.Optional(t.String())
+    })
+  })
+
+  .post('/emoticon', async ({ body, set }) => {
+    try {
+      const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY
+      if (!OPENROUTER_API_KEY) {
+        set.status = 500
+        return { error: 'OpenRouter API key not configured' }
+      }
+
+      const { lastAssistantMessage } = body as { lastAssistantMessage: string }
+
+      // Build the emoticon selection messages
+      const emoticonMessages: ChatMessage[] = [
+        {
+          role: 'system',
+          content: 'You are tasked with selecting an appropriate emoticon based on the content and mood of the assistant message.'
+        },
+        {
+          role: 'user',
+          content: `Here is the assistant's message: "${lastAssistantMessage}"\n\n${promptLoader.getEmoticonPrompt()}`
+        }
+      ]
+
+      const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
+          'Content-Type': 'application/json',
+          'HTTP-Referer': 'http://localhost:5847',
+          'X-Title': 'Komu Manga Reader'
+        },
+        body: JSON.stringify({
+          model: process.env.CHAT_MODEL || 'openai/gpt-4o',
+          messages: emoticonMessages,
+          temperature: 0.3, // Lower temperature for more consistent emoticon selection
+          max_tokens: 50,
+          stream: false
+        })
+      })
+
+      if (!response.ok) {
+        const errorText = await response.text()
+        console.error('OpenRouter API error for emoticon selection:', response.status, errorText)
+        set.status = 500
+        return { error: 'Failed to select emoticon from AI service' }
+      }
+
+      const result = await response.json() as any
+      
+      if (!result.choices || !result.choices[0] || !result.choices[0].message) {
+        console.error('Unexpected OpenRouter response format for emoticon:', result)
+        set.status = 500
+        return { error: 'Invalid response from AI service for emoticon selection' }
+      }
+
+      const selectedEmoticon = result.choices[0].message.content.trim()
+      
+      return {
+        emoticon: selectedEmoticon,
+        usage: result.usage
+      }
+
+    } catch (error) {
+      console.error('Emoticon selection error:', error)
+      set.status = 500
+      return { error: 'Internal server error during emoticon selection' }
+    }
+  }, {
+    body: t.Object({
+      lastAssistantMessage: t.String()
     })
   })

@@ -10,6 +10,7 @@ interface Message {
   content: string
   isStreaming?: boolean
   error?: boolean
+  emoticon?: string
 }
 
 interface ExplainInterfaceProps {
@@ -39,6 +40,7 @@ type ExplainAction =
   | { type: 'ADD_MESSAGE'; payload: Message }
   | { type: 'UPDATE_MESSAGE'; payload: { id: string; content: string } }
   | { type: 'COMPLETE_MESSAGE'; payload: string }
+  | { type: 'UPDATE_EMOTICON'; payload: { id: string; emoticon: string } }
   | { type: 'SET_LOADING'; payload: boolean }
   | { type: 'SET_TYPING'; payload: boolean }
   | { type: 'SET_ERROR'; payload: string | null }
@@ -73,6 +75,15 @@ const explainReducer = (state: ExplainState, action: ExplainAction): ExplainStat
         ),
         isLoading: false,
         isTyping: false
+      }
+    case 'UPDATE_EMOTICON':
+      return {
+        ...state,
+        messages: state.messages.map(msg =>
+          msg.id === action.payload.id
+            ? { ...msg, emoticon: action.payload.emoticon }
+            : msg
+        )
       }
     case 'SET_LOADING':
       return { ...state, isLoading: action.payload }
@@ -139,6 +150,32 @@ const useScrollManager = (messagesContainerRef: React.RefObject<HTMLDivElement>)
     resetScrollIntent,
     userScrollIntentRef
   }
+}
+
+// Custom hook for emoticon fetching
+const useEmoticonFetcher = () => {
+  const fetchEmoticon = useCallback(async (lastAssistantMessage: string): Promise<string | null> => {
+    try {
+      const response = await fetch('/api/explanations/emoticon', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ lastAssistantMessage })
+      })
+
+      if (!response.ok) {
+        console.warn('Failed to fetch emoticon:', response.status)
+        return null
+      }
+
+      const result = await response.json()
+      return result.emoticon || null
+    } catch (error) {
+      console.warn('Error fetching emoticon:', error)
+      return null
+    }
+  }, [])
+
+  return { fetchEmoticon }
 }
 
 // Custom hook for streaming API
@@ -508,6 +545,7 @@ export const ExplainInterface = React.forwardRef<ExplainInterfaceRef, ExplainInt
     } = useScrollManager(messagesContainerRef)
     
     const { streamChat, cancelRequest } = useStreamingChat()
+    const { fetchEmoticon } = useEmoticonFetcher()
 
     // Memoized values
     const currentLanguage = useMemo(() => 
@@ -597,6 +635,8 @@ export const ExplainInterface = React.forwardRef<ExplainInterfaceRef, ExplainInt
         mangaId
       }
 
+      let finalContent = ''
+      
       await streamChat(
         payload,
         // onStart
@@ -614,14 +654,30 @@ export const ExplainInterface = React.forwardRef<ExplainInterfaceRef, ExplainInt
         },
         // onToken
         (content: string) => {
+          finalContent = content
           dispatch({ 
             type: 'UPDATE_MESSAGE', 
             payload: { id: assistantId, content }
           })
         },
         // onComplete
-        () => {
+        async () => {
           dispatch({ type: 'COMPLETE_MESSAGE', payload: assistantId })
+          
+          // Fetch emoticon after message completes
+          if (finalContent.trim()) {
+            try {
+              const emoticon = await fetchEmoticon(finalContent)
+              if (emoticon) {
+                dispatch({ 
+                  type: 'UPDATE_EMOTICON', 
+                  payload: { id: assistantId, emoticon }
+                })
+              }
+            } catch (error) {
+              console.warn('Failed to fetch emoticon:', error)
+            }
+          }
         },
         // onError
         (error: string) => {
@@ -672,11 +728,58 @@ export const ExplainInterface = React.forwardRef<ExplainInterfaceRef, ExplainInt
           aria-live="polite"
         >
           {state.messages.map((message, index) => (
-            <MessageBubble 
-              key={message.id} 
-              message={message} 
-              index={index} 
-            />
+            <React.Fragment key={message.id}>
+              <MessageBubble 
+                message={message} 
+                index={index} 
+              />
+              
+              {/* Emoticon as separate message bubble */}
+              {message.role === 'assistant' && message.emoticon && !message.isStreaming && (
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ 
+                    type: "spring", 
+                    stiffness: 500, 
+                    damping: 30,
+                    delay: 0.3
+                  }}
+                  className="flex gap-3 justify-start"
+                >
+                  {/* Assistant Avatar */}
+                  <div className="flex-shrink-0 w-8 h-8 rounded-full overflow-hidden shadow-lg">
+                    <img 
+                      src="/avatar-komi.png" 
+                      alt="Komi"
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                  
+                  {/* Emoticon Message Bubble */}
+                  <div className="max-w-[80%]">
+                    <div className="bg-gray-200 dark:bg-gray-800 text-gray-900 dark:text-gray-100 rounded-2xl rounded-bl-md px-3 py-3">
+                      <div className="flex justify-center">
+                        <div className="w-32 h-32 select-none">
+                          <img 
+                            src={`/emoticons/${message.emoticon}.gif`} 
+                            alt={message.emoticon}
+                            className="w-full h-full object-cover select-none pointer-events-none"
+                            loading="lazy"
+                            draggable={false}
+                            style={{ 
+                              userSelect: 'none', 
+                              WebkitUserSelect: 'none',
+                              WebkitTouchCallout: 'none'
+                            }}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+            </React.Fragment>
           ))}
           
           <AnimatePresence>
